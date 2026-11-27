@@ -9,7 +9,7 @@ create table cx_threads(id uuid primary key,source_row int,kind text,owner_id uu
 create table ksnk_legacy_rows(id int primary key,sheet_name text,data jsonb);
 create table nk_feature_permissions(person uuid,grants jsonb);
 create table nk_role_permission_defaults(role text,grants jsonb);
-create function cx_key(v text) returns text language sql immutable as $$select lower(translate(trim(coalesce(v,'')),'ăâđêôơưàáảãạầấẩẫậằắẳẵặèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ','aadeoouaaaaaaaaaaaaaaaeeeeeeeeeeiiiiiooooooooooooooouuuuuuuuuuyyyyy'))$$;
+create function cx_key(v text) returns text language sql immutable as $select lower(regexp_replace(trim(coalesce(v,'')),'[[:space:]]+',' ','g'))$;
 create view cx_staff_catalog as select id as source_id,'surgery'::text as unit,cx_key(data->>'Mã NV') code,count(*) over(partition by data->>'Mã NV') copies from ksnk_legacy_rows where sheet_name='DM_NHANVIEN';
 create function nk_work_scope(cx_people,cx_threads) returns boolean language sql stable as $$select $1.active and $1.unit='surgery'$$;
 create function nk_work_feature_scope(p cx_people,k text,a text) returns text language sql stable as $$select case when p.legacy_operator or p.admin then 'hospital' when p.team_lead then 'team' else 'self' end$$;
@@ -18,13 +18,14 @@ create function cx_append(t uuid,who uuid,txt text,attachments jsonb,rid uuid) r
 `);
 await pg.exec(fs.readFileSync('supabase/20261121_phe_duyet_tac_vu.sql','utf8'));
 await pg.exec(fs.readFileSync('supabase/20261127_phe_duyet_linh_dong.sql','utf8'));
+await pg.exec(fs.readFileSync('supabase/20261127_dong_bo_chuc_vu_phe_duyet.sql','utf8'));
 const ids=Array.from({length:7},(_,i)=>'00000000-0000-0000-0000-'+String(i+1).padStart(12,'0'));
 const [nv,tt,tk,dd,out,work,rem]=ids;
-const positions=['nhan vien','to truong','truong khoa','dieu duong truong','to truong'];
+const positions=['Nhân viên','Tổ trưởng','Trưởng khoa','Điều dưỡng trưởng','to truong'];
 for(let i=0;i<5;i++){
  const code='nv'+i,dept=i===4?'Giặt là':'CSSD';
  await pg.query("insert into cx_people values($1,$2,true,false,'surgery',$3,$4,true,$5,$2,true,$6,$6,$3)",[ids[i],code,i>0,i===1||i===4,i===2||i===3,dept]);
- await pg.query("insert into ksnk_legacy_rows values($1,'DM_NHANVIEN',$2)",[i+1,JSON.stringify({'Mã NV':code,'Chức vụ':positions[i],'Trạng thái':'dang lam viec'})]);
+ await pg.query("insert into ksnk_legacy_rows values($1,'DM_NHANVIEN',$2)",[i+1,JSON.stringify({'Mã NV':code,'Chức vụ':positions[i],'Trạng thái':'Đang làm việc'})]);
 }
 for(const [id,kind,row,sheet] of [[work,'task',10,'GIAO VIỆC'],[rem,'reminder',11,'NHAC_VIEC_GHI_CHU']]){
  await pg.query("insert into cx_threads values($1,$2,$3,$4,$4,array[$5]::uuid[],'Thử')",[id,row,kind,tk,nv]);
