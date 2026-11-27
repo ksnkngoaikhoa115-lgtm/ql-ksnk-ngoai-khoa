@@ -200,6 +200,17 @@ async function dispatch(req:Request){
   must(source?.data?.['Trạng thái phê duyệt']!=='ĐÃ PHÊ DUYỆT','Hãy mở lại tác vụ trước khi sửa.',409);
  }
  if(['edit','detailSave','send','status','receive'].includes(b.action))must(writable,'Tài khoản chỉ có quyền xem.',403);
+ if(b.action==='workDeleteContext'){
+  must(t.kind!=='chat'&&t.source_row,'Tác vụ chưa liên kết hồ sơ.',409);
+  const rows=await rpc('nk_work_delete_options',{who:a.id,source_ids:[t.source_row]});
+  return {canDelete:Array.isArray(rows)&&rows.some((x:any)=>Number(x.source_id)===Number(t.source_row)&&x.can_delete)};
+ }
+ if(b.action==='deleteWork'){
+  must(req.headers.get('origin')===new URL(req.url).origin,'Nguồn yêu cầu không hợp lệ.',403);
+  must(t.kind!=='chat'&&t.source_row,'Tác vụ chưa liên kết hồ sơ.',409);
+  must(await rpc('nk_work_delete_v2',{who:a.id,work_id:t.id}),'Không có quyền xóa hoặc tác vụ đã phê duyệt.',403);
+  return {ok:true};
+ }
  if(b.action==='approvalContext'){
   must(t.kind!=='chat'&&t.source_row,'Tác vụ chưa liên kết hồ sơ.',409);
   const context=await rpc('nk_approval_context',{who:a.id,work_id:t.id});

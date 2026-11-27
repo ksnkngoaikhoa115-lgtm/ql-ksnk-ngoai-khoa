@@ -584,6 +584,7 @@ export async function GET(req:Request){const viewer=await actor();if(!viewer)ret
       same(x.person,ownName)||text(x.personId)&&same(x.personId,viewer.staff_code));
     safe.total=safe.rows.length;
   }
+  if(['tasks','reminders'].includes(moduleName))await attachWorkDeleteRights(viewer,safe);
   return NextResponse.json({ok:true,module:moduleName,...safe},{headers:{'Cache-Control':'private,no-store'}});
  }
  const grantedFilters=parseFilters(url);
@@ -626,8 +627,16 @@ export async function GET(req:Request){const viewer=await actor();if(!viewer)ret
   result.canDeleteChecklist=(await featureScope(viewer,'checklists','delete'))!=='none';
   result.canScore=result.canCreateChecklist||result.canEditChecklist;
  }
+ if(['tasks','reminders'].includes(moduleName))await attachWorkDeleteRights(viewer,result);
  return NextResponse.json({ok:true,module:moduleName,...result},{headers:{'Cache-Control':'private, no-store'}});}catch(error){console.error('[modules:get]',error);return NextResponse.json({ok:false,error:'Không tải được dữ liệu phân hệ',detail:error instanceof Error?error.message:'Lỗi Supabase'},{status:503});}}
 
+async function attachWorkDeleteRights(viewer:NonNullable<Awaited<ReturnType<typeof actor>>>,result:AnyRecord){
+ const rows:AnyRecord[]=[...(Array.isArray(result.rows)?result.rows:[]),...(Array.isArray(result.approvalItems)?result.approvalItems:[]),...(Array.isArray(result.reminders)?result.reminders:[])];
+ const ids=[...new Set(rows.map(row=>Number(row.sourceId)).filter(x=>Number.isSafeInteger(x)&&x>0))];
+ const allowed=new Set<number>();
+ if(ids.length){const reply=await db().rpc('nk_work_delete_options',{who:viewer.id,source_ids:ids});if(!reply.error)for(const item of reply.data||[])if(item.can_delete)allowed.add(Number(item.source_id));}
+ for(const row of rows)row.canDelete=allowed.has(Number(row.sourceId));
+}
 /** Quyền sửa phiếu đang tồn tại theo danh tính người giao / người thực hiện / tổ trưởng.
  * Không dùng tên do client gửi lên để xác nhận quyền. */
 async function getWorkEditRights(user:NonNullable<Awaited<ReturnType<typeof actor>>>,moduleName:'tasks'|'reminders',rowNo:number){
@@ -663,6 +672,16 @@ async function getWorkEditRights(user:NonNullable<Awaited<ReturnType<typeof acto
 }
 
 export async function POST(req:Request){const user=await actor();if(!user)return NextResponse.json({ok:false,error:'Chưa đăng nhập'},{status:401});try{const body=(await req.json()) as AnyRecord;const moduleName=text(body.module);const op=text(body.op)||'save';
+ if(['tasks','reminders'].includes(moduleName)&&op==='delete'){
+  if(req.headers.get('origin')!==new URL(req.url).origin)return NextResponse.json({ok:false,error:'Nguồn yêu cầu không hợp lệ.'},{status:403});
+  const rowNo=Number(body.row_no);if(!Number.isSafeInteger(rowNo)||rowNo<=0)return NextResponse.json({ok:false,error:'Thiếu mã tác vụ.'},{status:400});
+  const row=await readRow(moduleName==='tasks'?S.tasks:S.reminders,rowNo);if(!row)return NextResponse.json({ok:false,error:'Không tìm thấy tác vụ.'},{status:404});
+  const {data:t,error}=await db().from('cx_threads').select('id').eq('source_row',row.id).eq('kind',moduleName==='tasks'?'task':'reminder').eq('units','{surgery}').maybeSingle();
+  if(error)throw error;if(!t)return NextResponse.json({ok:false,error:'Tác vụ chưa có liên kết hợp lệ.'},{status:409});
+  const r=await db().rpc('nk_work_delete_v2',{who:user.id,work_id:t.id});
+  if(r.error||!r.data)return NextResponse.json({ok:false,error:'Không có quyền xóa hoặc tác vụ đã phê duyệt. Hãy kiểm tra quyền và trạng thái.'},{status:403});
+  return NextResponse.json({ok:true});
+ }
  if(moduleName==='checklists'){
   const rowNo=Number(body.row_no)||0;
   const action=op==='delete'?'delete':rowNo>0?'edit':'create';

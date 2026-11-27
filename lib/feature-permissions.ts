@@ -60,6 +60,7 @@ export function defaultFeatureScope(person:Person,feature:Feature,action:Action)
   return workCanEdit?(chief?'hospital':lead?'team':'none'):'none'
  if(feature==='staff'&&['create','edit','delete'].includes(action))return workCanEdit&&chief?'hospital':'none'
  if(['plans','issues'].includes(feature)&&['create','edit'].includes(action)&&!chief&&!lead)return 'self'
+ if(feature==='reminders'&&action==='delete'&&!chief&&!lead)return 'self'
  if(feature==='tasks'&&action==='approve')
   return workCanEdit&&Boolean(person.can_approve_work)&&(chief||lead)?base:'none' // Actual approval also needs the named reviewer.
  if(['create','edit','delete'].includes(action))return workCanEdit?(chief?'hospital':lead?'team':'none'):'none'
