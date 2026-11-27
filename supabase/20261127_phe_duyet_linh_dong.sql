@@ -2,7 +2,7 @@ begin;
 -- Staged, additive approval RPCs. No changes to existing records on install.
 -- All functions are invoker-security and service_role-only.
 create or replace function public.nk_approval_position(p public.cx_people)
-returns text language sql stable set search_path=public as $
+returns text language sql stable set search_path=public as $$
  select case translate(regexp_replace(normalize(public.cx_key(coalesce(nullif(r.data->>'Chức vụ',''),r.data->>'Chức danh','')),NFD),U&'[\0300-\036f]','','g'),'đ','d')
  when 'truong khoa' then 'Trưởng khoa' when 'pho khoa' then 'Phó khoa'
  when 'dieu duong truong' then 'Điều dưỡng trưởng' when 'dd truong' then 'Điều dưỡng trưởng'
@@ -18,7 +18,7 @@ returns text language sql stable set search_path=public as $
  where p.active and p.unit='surgery' and nullif(p.staff_code,'') is not null
  and s.unit=p.unit and s.code=public.cx_key(p.staff_code) and s.copies=1
  and translate(regexp_replace(normalize(public.cx_key(coalesce(r.data->>'Trạng thái','')),NFD),U&'[\0300-\036f]','','g'),'đ','d') in ('','dang lam viec','dang lam','lam viec','hoat dong')
-$;
+$$;
 create or replace function public.nk_approval_rank(pos text)
 returns integer language sql immutable set search_path=public as $$
  select case pos when 'Trưởng khoa' then 3 when 'Phó khoa' then 2 when 'Điều dưỡng trưởng' then 2 when 'Tổ trưởng' then 1 when 'Nhân viên' then 0 else -1 end

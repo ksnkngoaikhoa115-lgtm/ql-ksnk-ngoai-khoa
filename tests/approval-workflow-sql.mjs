@@ -9,7 +9,7 @@ create table cx_threads(id uuid primary key,source_row int,kind text,owner_id uu
 create table ksnk_legacy_rows(id int primary key,sheet_name text,data jsonb);
 create table nk_feature_permissions(person uuid,grants jsonb);
 create table nk_role_permission_defaults(role text,grants jsonb);
-create function cx_key(v text) returns text language sql immutable as $select lower(regexp_replace(trim(coalesce(v,'')),'[[:space:]]+',' ','g'))$;
+create function cx_key(v text) returns text language sql immutable as $$select lower(regexp_replace(trim(coalesce(v,'')),'[[:space:]]+',' ','g'))$$;
 create view cx_staff_catalog as select id as source_id,'surgery'::text as unit,cx_key(data->>'Mã NV') code,count(*) over(partition by data->>'Mã NV') copies from ksnk_legacy_rows where sheet_name='DM_NHANVIEN';
 create function nk_work_scope(cx_people,cx_threads) returns boolean language sql stable as $$select $1.active and $1.unit='surgery'$$;
 create function nk_work_feature_scope(p cx_people,k text,a text) returns text language sql stable as $$select case when p.legacy_operator or p.admin then 'hospital' when p.team_lead then 'team' else 'self' end$$;
@@ -33,8 +33,15 @@ for(const [id,kind,row,sheet] of [[work,'task',10,'GIAO VIỆC'],[rem,'reminder'
 }
 const ctx=async(who,id=work)=>(await pg.query('select nk_approval_context($1,$2) x',[who,id])).rows[0].x;
 const act=async(who,operation,reviewer=null,note='Nội dung',id=work,rid=crypto.randomUUID(),old=null)=>{const c=old||await ctx(who,id);return (await pg.query('select nk_work_decision_v2($1,$2,$3,$4,$5,$6,$7,$8) ok',[who,id,rid,operation,reviewer,note,c.status,c.revision])).rows[0].ok};
+await pg.query("insert into nk_feature_permissions values($1,$2)",[tt,JSON.stringify({tasks:{approve:'none'}})]);
+assert(!(await ctx(nv)).candidates.some(p=>p.id===tt));
+assert(!(await ctx(nv,rem)).candidates.some(p=>p.id===tt));
+await pg.query("delete from nk_feature_permissions where person=$1",[tt]);
 const start=await ctx(nv);assert.deepEqual(start.candidates.map(p=>p.id),[tk,tt,dd]);assert.equal(start.canSubmit,true);
 const rid=crypto.randomUUID();assert.equal(await act(nv,'request',tt,'Nội dung',work,rid,start),true);assert.equal(await act(nv,'request',tt,'Nội dung',work,rid,start),true);
+await pg.query("insert into nk_feature_permissions values($1,$2)",[tt,JSON.stringify({tasks:{approve:'none'}})]);
+assert.equal(await act(tt,'approve'),false);
+await pg.query("delete from nk_feature_permissions where person=$1",[tt]);
 assert.equal(await act(tk,'approve'),false);assert.equal(await act(tt,'reject',null,''),false);
 assert.equal(await act(tt,'approve'),true);assert.equal((await ctx(nv)).canSubmit,true);assert.equal((await ctx(tt)).canSubmit,true);
 assert.equal(await act(tt,'request',tk),true);assert.equal(await act(tk,'reject'),true);assert.equal(await act(nv,'request',dd),false);

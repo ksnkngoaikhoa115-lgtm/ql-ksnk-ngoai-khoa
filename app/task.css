@@ -235,3 +235,29 @@
  .home-screen-fluid .app-main>main.content-shell,
  .work-screen-fluid .app-main>main>.work-task-area>.work-task-list>.content-shell{padding-left:10px;padding-right:10px}
 }
+
+/* Phone: full viewport, independent content or chat; desktop stays split. */
+.work-mobile-header{display:none}
+.work-form-scroll{min-width:0}
+@media(max-width:760px){
+ .modal-backdrop.work-dialog-backdrop{position:fixed!important;inset:0!important;padding:0!important;display:flex!important;align-items:stretch!important;justify-content:stretch!important;overflow:hidden!important;z-index:120!important}
+ .work-dialog-backdrop .work-detail-layout{width:100%!important;max-width:100%!important;height:100dvh!important;max-height:100dvh!important;min-height:0!important;min-width:0!important;margin:0!important;border:0!important;border-radius:0!important;display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto minmax(0,1fr)!important;overflow:hidden!important;box-shadow:none!important}
+ .work-mobile-header{display:block;grid-column:1;grid-row:1;background:#173b76;color:#fff;padding-top:env(safe-area-inset-top,0px)}
+ .work-mobile-title{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;min-height:48px}
+ .work-mobile-title button{min-height:44px;min-width:76px;border:1px solid #ffffff55;background:#ffffff15;color:#fff;border-radius:8px;font-size:14px}
+ .work-mobile-tabs{display:grid;grid-template-columns:1fr 1fr;background:#fff;border-bottom:1px solid #ccd8e8}
+ .work-mobile-tabs button{min-height:48px;background:#fff;color:#465b75;border:0;border-bottom:3px solid transparent;font-size:15px;font-weight:750}
+ .work-mobile-tabs button[aria-selected=true]{border-bottom-color:#164795;color:#164795;background:#eef4ff}
+ .work-detail-layout .work-dialog-close{display:none!important}
+ .work-detail-layout .work-detail-fields,.work-detail-layout .work-detail-chat{grid-column:1;grid-row:2;width:100%;height:100%;min-height:0;min-width:0;border:0;overflow:hidden}
+ .work-detail-layout[data-mobile-tab=details] .work-detail-chat,.work-detail-layout[data-mobile-tab=chat] .work-detail-fields{display:none!important}
+ .work-detail-layout .work-detail-fields .task-form{height:100%!important;min-height:0!important;max-height:100%!important;padding:0!important;display:flex!important;flex-direction:column;overflow:hidden!important;gap:0}
+ .work-form-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:12px}
+ .work-detail-fields .form-grid,.work-detail-fields .task-approval-record-grid,.work-detail-fields .task-approval-evaluation-grid,.work-detail-fields .task-approval-record-evidence{grid-template-columns:minmax(0,1fr)!important}
+ .work-detail-fields input,.work-detail-fields select,.work-detail-fields textarea{font-size:16px!important;max-width:100%;min-width:0}
+ .work-detail-fields input:not([type=checkbox]):not([type=radio]),.work-detail-fields select{min-height:44px}
+ .work-detail-fields .form-actions{position:relative!important;flex:none;bottom:auto;padding:8px 12px max(8px,env(safe-area-inset-bottom));border-top:1px solid #d6e0ec;display:flex;flex-wrap:wrap;gap:8px;background:#fff}
+ .work-detail-fields .form-actions button{min-height:46px;flex:1;font-size:14px;white-space:normal}
+ .work-detail-chat>h3{display:none}
+ .work-detail-chat iframe{width:100%;height:100%;min-height:0;flex:1}
+}
