@@ -1,0 +1,49 @@
+name: Verify and mirror exact KSNK source
+on:
+  push:
+    branches: ['mirror/source-copy-helper-20261127']
+    paths: ['.github/workflows/mirror-exact-source.yml']
+permissions:
+  contents: write
+concurrency:
+  group: mirror-exact-512dbcd
+  cancel-in-progress: false
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify source tree and update only staging branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GIT_TERMINAL_PROMPT: '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = ksnkngoaikhoa115-lgtm/ql-ksnk-ngoai-khoa
+          git init --quiet mirror
+          cd mirror
+          git config user.name 'KSNK source mirror'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          SRC=512dbcd3fe419e9a74a5eaabfc7bc895bda13849
+          EXPECTED_TREE=f1c6cd590efe57e94aebec644a969d8d36aa4106
+          TARGET=refs/heads/mirror/512dbcd-staging
+          git fetch --no-tags --depth=1 https://github.com/phamtu115na-tech/ql-ksnk-ngoai-khoa.git "$SRC"
+          test "$(git rev-parse FETCH_HEAD)" = "$SRC"
+          test "$(git rev-parse "$SRC^{tree}")" = "$EXPECTED_TREE"
+          test "$(git ls-tree -r "$SRC" | grep -c ' blob ')" = 180
+          git cat-file -e "$SRC:package.json"
+          git cat-file -e "$SRC:package-lock.json"
+          git fetch --no-tags --depth=1 "https://github.com/$GITHUB_REPOSITORY.git" "$TARGET"
+          HEAD_BEFORE="$(git rev-parse FETCH_HEAD)"
+          test "$HEAD_BEFORE" = 655e866c7402685d04e514d79f19305960f38a38
+          NEW="$(printf '%s\n' 'Mirror exact 180-file source tree of 512dbcd [skip ci]' | git commit-tree "$EXPECTED_TREE" -p "$HEAD_BEFORE")"
+          test "$(git rev-parse "$NEW^{tree}")" = "$EXPECTED_TREE"
+          git diff --exit-code "$SRC" "$NEW" --
+          ASKPASS="$(mktemp)"
+          trap 'rm -f "$ASKPASS"' EXIT
+          printf '%s\n' '#!/bin/sh' 'case "$1" in *Username*) echo x-access-token;; *) printf "%s\\n" "$GH_TOKEN";; esac' > "$ASKPASS"
+          chmod 700 "$ASKPASS"
+          GIT_ASKPASS="$ASKPASS" git push "https://github.com/$GITHUB_REPOSITORY.git" "$NEW:$TARGET"
+          test "$(git ls-remote "https://github.com/$GITHUB_REPOSITORY.git" "$TARGET" | cut -f1)" = "$NEW"
+          printf 'Verified exact tree %s; 180 blobs; staging commit %s\n' "$EXPECTED_TREE" "$NEW"
