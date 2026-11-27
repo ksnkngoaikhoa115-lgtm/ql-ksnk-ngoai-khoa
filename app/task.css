@@ -263,3 +263,11 @@
 }
 
 .work-detail-fields .form-actions .work-delete-btn{margin-right:auto;background:#b42318!important;color:#fff!important;border:1px solid #b42318!important;font-weight:800;min-height:44px}.work-detail-fields .form-actions .work-delete-btn:hover{background:#912018!important}@media(max-width:760px){.work-detail-fields .form-actions .work-delete-btn{flex-basis:100%;margin:0}}
+
+/* Reminder summary and combined title/note — same visual system as task overview. */
+.reminder-summary-panel{margin:12px 0 16px;box-shadow:0 2px 8px #17335f0d}
+.reminder-summary-five{grid-template-columns:repeat(5,minmax(0,1fr))}
+.reminder-title-cell{min-width:180px;white-space:normal;overflow-wrap:anywhere;line-height:1.45}
+.reminder-title-cell>strong{display:block;color:#173b76;font-size:14px;margin-bottom:6px}
+.reminder-title-cell>div{white-space:pre-wrap;color:#465b75;font-size:13px;font-weight:400}
+.reminder-editor-grid>.wide{grid-column:1/-1}
