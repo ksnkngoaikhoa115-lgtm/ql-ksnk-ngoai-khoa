@@ -200,14 +200,18 @@ async function dispatch(req:Request){
   must(source?.data?.['Trạng thái phê duyệt']!=='ĐÃ PHÊ DUYỆT','Hãy mở lại tác vụ trước khi sửa.',409);
  }
  if(['edit','detailSave','send','status','receive'].includes(b.action))must(writable,'Tài khoản chỉ có quyền xem.',403);
+ if(b.action==='approvalContext'){
+  must(t.kind!=='chat'&&t.source_row,'Tác vụ chưa liên kết hồ sơ.',409);
+  const context=await rpc('nk_approval_context',{who:a.id,work_id:t.id});
+  must(context,'Không đọc được quyền phê duyệt.',403);
+  return {context};
+ }
  if(b.action==='decision'){
-  must(writable&&t.kind!=='chat'&&uuid(b.requestId)&&['request','approve','supplement','reject','reopen'].includes(b.operation));
-  if(b.operation!=='request'){
-   const permission=await featureScope(a,'tasks','approve');
-   must(permission!=='none','Quyền phê duyệt đã bị tắt trong ma trận.',403);
-  }
-  must(b.operation!=='request'||uuid(b.reviewer));
-  must(await rpc('nk_work_decision',{who:a.id,work_id:t.id,rid:b.requestId,operation:b.operation,reviewer:b.reviewer||null,note:str(b.note||'',2000),expected:str(b.expected||'',120)}),'Quyền hoặc trạng thái tác vụ vừa thay đổi. Mở lại để kiểm tra.',409);return {ok:true};
+  must(t.kind!=='chat'&&t.source_row&&uuid(b.requestId)&&Number.isSafeInteger(b.expectedRevision)&&b.expectedRevision>=0&&['request','approve','forward','consult','supplement','reject','reopen'].includes(b.operation));
+  const next=['request','forward','consult'].includes(b.operation);
+  must(next?uuid(b.reviewer):!b.reviewer);
+  must(await rpc('nk_work_decision_v2',{who:a.id,work_id:t.id,rid:b.requestId,operation:b.operation,reviewer:b.reviewer||null,note:str(b.note||'',2000),expected:str(b.expected||'',120),expected_revision:b.expectedRevision,evaluation:b.evaluation==null?null:str(b.evaluation,120)}),'Quyền hoặc trạng thái tác vụ vừa thay đổi. Mở lại để kiểm tra.',409);
+  return {ok:true};
  }
  if(b.action==='detailSave'){
  const label=str(b.title,180);must(label&&uuid(b.requestId)&&b.requestId!==a.id&&Number.isInteger(b.expected));

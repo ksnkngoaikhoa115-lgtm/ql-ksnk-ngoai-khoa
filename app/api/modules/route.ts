@@ -492,30 +492,8 @@ export async function GET(req:Request){const viewer=await actor();if(!viewer)ret
  const source=await db().from('nk_legacy_rows').select('id,row_no,legacy_id,data').eq('id',t.source_row).eq('sheet_name',t.kind==='task'?S.tasks:S.reminders).maybeSingle();if(source.error)throw source.error;
  if(!source.data)return NextResponse.json({ok:false},{status:404});
  const rights=await getWorkEditRights(viewer,t.kind==='task'?'tasks':'reminders',source.data.row_no);
- // Quyền quản lý phê duyệt phải được đối chiếu tại server, không dựa vào nhãn Chức vụ trên giao diện.
- let canReview=false,managerAccount=false;
- if(t.kind==='task'){
-  const {data:person,error:personError}=await db().from('cx_people')
-   .select('active,admin,legacy_operator,team_lead,work_role_reviewed,work_view,work_edit,can_approve_work,staff_code')
-   .eq('id',viewer.id).maybeSingle();
-  if(personError)throw personError;
-  managerAccount=Boolean(person?.active&&(person.admin||person.legacy_operator||person.team_lead)&&person.work_view);
-  const state=norm(pick(source.data.data,['Trạng thái phê duyệt','Trạng thái xin ý kiến']));
-  const pending=['cho phe duyet','cho quan ly phan hoi','cho quan ly phe duyet'].includes(state);
-  if(pending&&person?.active){
-   const {data:threadInfo,error:threadError}=await db().from('cx_threads').select('owner_id,performers').eq('id',id).maybeSingle();
-   if(threadError)throw threadError;
-   const excluded=threadInfo?.owner_id===viewer.id||
-     Boolean(Array.isArray(threadInfo?.performers)&&threadInfo.performers.includes(viewer.id)&&
-       text(source.data.data?.['Người xin duyệt ID'])===viewer.id);
-   const assigned=text(source.data.data?.['Tài khoản duyệt']);
-   const namedCode=text(source.data.data?.['Mã người quản lý']);
-   const matchingAssignee=assigned?assigned===viewer.id:Boolean(namedCode&&person.staff_code&&same(namedCode,person.staff_code));
-   canReview=Boolean(!excluded&&(person.admin||
-     (person.can_approve_work&&person.work_edit&&
-       (person.legacy_operator||(person.work_role_reviewed&&person.team_lead))&&matchingAssignee)));
-  }
- }
+ const approval=await db().rpc('nk_approval_context',{who:viewer.id,work_id:id});if(approval.error)throw approval.error;
+ const canReview=Boolean(approval.data?.canReview),managerAccount=Boolean(approval.data?.actorPosition&&approval.data.actorPosition!=='Nhân viên');
  return NextResponse.json({ok:true,kind:t.kind,row:t.kind==='task'?task(source.data):reminder(source.data),canEdit:Boolean(rights?.canSave),canReview,managerAccount});
  }
  const viewFeature=({checklists:'checklists',reports:'reports',violations:'violations',plans:'plans',staff:'staff',tasks:'tasks',reminders:'reminders',alerts:'alerts',kpi:'kpi'} as Record<string,'checklists'|'reports'|'violations'|'plans'|'staff'|'tasks'|'reminders'|'alerts'|'kpi'>)[moduleName];
@@ -855,7 +833,7 @@ export async function POST(req:Request){const user=await actor();if(!user)return
  if(moduleName==='reminders'&&op==='daily'){const row=await readRow(S.reminders,Number(body.row_no));if(!row)throw new Error('Không tìm thấy nhắc việc.');const data:AnyRecord={...row.data,'NHẮC HÀNG NGÀY':Boolean(body.daily)};if(Boolean(body.daily)&&done(data['TRẠNG THÁI']))data['TRẠNG THÁI']='CHƯA THỰC HIỆN';await saveRow(S.reminders,row.row_no,data);return NextResponse.json({ok:true,row_no:row.row_no,daily:Boolean(body.daily)});}
  if(op==='delete'){if(moduleName==='checklists'){await deleteChecklistHistory(Number(body.row_no));}else{const sheet=sheetFor(moduleName,body);if(!sheet||body.sheet&&body.sheet!==sheet)throw Error('Bảng không thuộc phân hệ.');await deleteRow(sheet,Number(body.row_no));}return NextResponse.json({ok:true});}
  if(op==='inline')return NextResponse.json({ok:true,...await inlineUpdate(body)});
- if(moduleName==='tasks'&&op==='approval'){if(text(body.action||'request')==='request')return NextResponse.json({ok:false,error:'Vui lòng gửi yêu cầu bằng biểu mẫu Quản lý phê duyệt (theo Chức vụ) đã liên kết tài khoản, tránh gửi trùng.'},{status:409});return NextResponse.json({ok:true,...await saveTaskApproval(body)});}
+ if(moduleName==='tasks'&&op==='approval'){return NextResponse.json({ok:false,error:'Vui lòng xử lý phê duyệt và phản hồi ngay trong bảng phê duyệt hoặc trò chuyện của tác vụ.'},{status:409});}
  if(moduleName==='checklists'&&(op==='save'||!op))return NextResponse.json({ok:true,...await saveChecklistParity(body.data||body)});
  if(moduleName==='plans'&&['complete','reset','plan_status'].includes(op)){const sheet=sheetFor('plans',body);const row=await readRow(sheet,Number(body.row_no));if(!row)throw new Error('Không tìm thấy kế hoạch.');const data={...row.data};const status=op==='complete'?'HOÀN THÀNH':op==='reset'?'CHƯA BẮT ĐẦU':body.status||'CHƯA BẮT ĐẦU';data['Trạng thái']=status;data['Kết quả']=body.result??data['Kết quả']??'';data['Ngày hoàn thành']=status==='HOÀN THÀNH'?today():'';await saveRow(sheet,row.row_no,data);return NextResponse.json({ok:true,row_no:row.row_no});}
  if(moduleName==='plans'&&op==='carry'){const sheet=sheetFor('plans',body);const row=await readRow(sheet,Number(body.row_no));if(!row)throw new Error('Không tìm thấy kế hoạch cần chuyển tiếp.');const old=plan(row,text(body.type).toUpperCase()||'TUẦN');const next=carryDates(old.fromDate,old.toDate,old.type);await saveRow(sheet,row.row_no,{...row.data,'Trạng thái':'CHUYỂN TIẾP','Kỳ chuyển tiếp':old.type==='THÁNG'?'THÁNG SAU':'TUẦN SAU'});const newId=old.type==='THÁNG'?`KHM${Date.now()}`:`KHT${Date.now()}`;const newRow=await saveRow(sheet,undefined,{...row.data,'Mã KH':newId,'Từ ngày':next.from,'Đến ngày':next.to,'Trạng thái':'CHƯA BẮT ĐẦU','Kết quả':'','Ngày hoàn thành':'','Mã kế hoạch gốc':old.rootId||old.id,'Kỳ chuyển tiếp':old.type==='THÁNG'?'THÁNG SAU':'TUẦN SAU'});return NextResponse.json({ok:true,row_no:newRow,id:newId});}
