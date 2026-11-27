@@ -1,0 +1,237 @@
+.connection{max-width:1406px;margin:10px auto 0;padding:9px 13px;border-radius:8px;background:#fff4e5;color:#8a4b08;font-weight:700;font-size:13px}.connection.connected{background:#e8f7ee;color:#146c43}.error-box{padding:11px 14px;margin-bottom:14px;border:1px solid #fda29b;border-radius:8px;background:#fff1f0;color:#b42318}.add-btn{background:var(--green-115)!important}.task-list{display:grid;gap:14px}.task-card{border:1px solid #dbe3ee;border-left:5px solid var(--blue-115);border-radius:10px;padding:16px;background:#fff;box-shadow:0 2px 8px rgba(18,59,143,.05)}.task-head{display:flex;justify-content:space-between;align-items:flex-start;gap:15px}.task-head h3{margin:4px 0;color:#17335f;font-size:18px}.eyebrow{font-size:11px;font-weight:800;color:#64748b}.status{white-space:nowrap;border-radius:999px;padding:5px 10px;background:#fff4e5;color:#8a4b08;font-size:12px;font-weight:800}.status.done{background:#e8f7ee;color:#146c43}.task-description{margin:12px 0;padding:12px 14px;background:#f5f8ff;border-radius:8px;line-height:1.5}.task-description p{margin:5px 0 0;white-space:pre-wrap}.task-meta{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}.task-meta span{font-size:13px}.task-meta b{display:block;color:#60708b;font-size:11px;text-transform:uppercase;margin-bottom:4px}.edit-btn{margin-top:14px;border:1px solid var(--blue-115);background:#fff;color:var(--blue-115);border-radius:7px;padding:8px 11px;font-weight:700;cursor:pointer}.pager{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:16px}.pager button{padding:7px 12px}.modal-backdrop{position:fixed;inset:0;z-index:100;background:rgba(15,23,42,.62);display:grid;place-items:center;padding:18px;overflow:auto}.task-form{width:min(820px,100%);max-height:95vh;overflow:auto;background:#fff;border-radius:14px;padding:20px;box-shadow:0 22px 55px rgba(0,0,0,.3)}.form-title{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #eaf1ff;margin-bottom:16px}.form-title h3{color:var(--blue-115)}.form-title button{border:0;background:none;font-size:28px;cursor:pointer}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.form-grid label{font-size:13px;font-weight:700;color:#334155}.form-grid .wide{grid-column:1/-1}.form-grid input,.form-grid textarea,.form-grid select{display:block;width:100%;margin-top:6px;padding:10px;border:1px solid #cbd5e1;border-radius:7px;font:inherit}.evidence-label{padding:12px;border:1px dashed #8aa5dd;border-radius:8px;background:#f8faff}.evidence-label small{font-weight:400}.form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}.form-actions button{padding:10px 16px;border:0;border-radius:7px;font-weight:800;cursor:pointer}.save-btn{background:var(--blue-115);color:#fff}
+@media(max-width:780px){.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}.task-meta{grid-template-columns:1fr 1fr}.connection{margin:8px 14px 0}.task-head{flex-direction:column}}
+.save-spinner{display:inline-block;width:14px;height:14px;margin-right:7px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;vertical-align:-2px;animation:save-spin .75s linear infinite}@keyframes save-spin{to{transform:rotate(360deg)}}
+.task-work-type-picker{display:flex;flex-direction:column;gap:4px;min-width:310px;max-width:430px;margin-left:auto;padding:7px 10px;border:1px solid #bfd1ed;border-radius:8px;background:#f5f8ff;color:#123b8f}.task-work-type-picker>span{font-size:11px;font-weight:900;letter-spacing:.03em}.task-work-type-options{display:flex;gap:6px;align-items:stretch}.task-work-type-options label{display:flex;align-items:center;gap:4px;flex:1;padding:5px 6px;border:1px solid #d4deee;border-radius:6px;background:#fff;color:#17335f;font-size:11px;line-height:1.2;cursor:pointer}.task-work-type-options label:has(input:checked){border-color:#1677ff;background:#eaf2ff;color:#0d4fa8}.task-work-type-options input{margin:0;accent-color:#1677ff}.task-work-type-badge{display:inline-block;margin-top:5px;padding:4px 8px;border-radius:999px;background:#eaf2ff;color:#0d4fa8;font-size:11px;font-weight:800}@media(max-width:780px){.form-title{flex-wrap:wrap;gap:8px}.task-work-type-picker{order:3;width:100%;max-width:none;margin-left:0}.task-work-type-options{flex-direction:column}.task-work-type-options label{font-size:12px}}
+.task-work-type-picker{background:#f8fafc;color:#17335f}.task-work-type-options label:has(input[value="CV TRỌNG ĐIỂM & ĐỘT XUẤT"]:checked){border-color:#f59e0b;background:#fef0c7;color:#92400e}.task-work-type-options label:has(input[value="CV TRỌNG ĐIỂM & ĐỘT XUẤT"]:checked) input{accent-color:#d97706}.task-work-type-options label:has(input[value="CV DÀI HẠN & KHÁC"]:checked){border-color:#2e90fa;background:#d1e9ff;color:#175cd3}.task-work-type-options label:has(input[value="CV DÀI HẠN & KHÁC"]:checked) input{accent-color:#175cd3}.task-work-type-options label:focus-within{outline:2px solid rgba(46,144,250,.35);outline-offset:1px}
+
+/* Shared filters remain outside the list/board presentation switch. */
+.task-layout-switch{display:flex;gap:4px;padding:5px;background:#e4ebf5;border-radius:12px;flex-wrap:wrap}
+.task-layout-switch button{border:0;background:transparent;color:#334155;padding:10px 16px;border-radius:8px;font-weight:700;cursor:pointer}
+.task-layout-switch button[aria-pressed=true]{background:#1949a5;color:#fff;box-shadow:0 2px 6px #173e7b26}
+.task-layout-switch button:focus-visible,.deadline-card:focus-visible,.deadline-board-scroll:focus-visible{outline:3px solid #facc15;outline-offset:3px}
+.deadline-board{min-width:0;border-radius:16px;padding:18px;background:radial-gradient(ellipse at 90% 90%,#087caa88,transparent 55%),linear-gradient(120deg,#463da0,#242567 70%,#144e80);color:#fff}
+.deadline-board-caption{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:2px 4px 16px}
+.deadline-board-caption strong{font-size:17px;letter-spacing:.04em}.deadline-board-caption p{margin:6px 0 0;color:#e1e8ff;font-size:13px}.deadline-board-caption>span{font-size:12px;color:#e1e8ff}
+.deadline-board-scroll{display:flex;gap:12px;overflow-x:auto;padding:3px 3px 16px;align-items:stretch;scrollbar-color:#9caaeb #ffffff15}
+.deadline-column{flex:0 0 250px;min-width:0;border-right:1px dashed #ffffff40;padding-right:10px}
+.deadline-column h3{margin:0 0 12px;border-radius:6px 6px 12px 6px;padding:10px 12px;color:#14223b;font-size:13px;display:flex;justify-content:space-between;gap:8px}
+.deadline-column h3 b{background:#ffffff70;border-radius:12px;padding:1px 7px}
+.deadline-column-cards{height:clamp(340px,58vh,720px);overflow-y:auto;padding:2px 5px 8px 1px;scrollbar-width:thin;scrollbar-color:#c5c7f3 transparent}
+.deadline-card{width:100%;display:flex;flex-direction:column;gap:10px;background:#fff;border:1px solid #e6e9f2;border-radius:11px;padding:13px;margin-bottom:10px;color:#24334b;text-align:left;cursor:pointer;box-shadow:0 3px 9px #11153330;font:inherit}
+.deadline-card:hover{border-color:#93b9ff;box-shadow:0 5px 14px #11153350}.deadline-card-title{font-size:14px;font-weight:700;line-height:1.45;overflow-wrap:anywhere}
+.deadline-description{font-size:12px;line-height:1.5;color:#64748b;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.deadline-tags{display:flex;gap:5px;flex-wrap:wrap}.deadline-tags>span{font-size:11px;padding:4px 7px;border-radius:12px;background:#edf3fb;color:#405676}.deadline-card-overdue .deadline-tags>span:first-child{background:#fff0f0;color:#b42332}
+.deadline-worktype{font-size:10px;font-weight:700;color:#48659a;overflow-wrap:anywhere}.deadline-person{display:flex;align-items:center;gap:8px;font-size:12px}.deadline-avatar{border-radius:50%;background:#e0ecff;color:#2459a6;width:30px;height:30px;display:grid;place-items:center;flex-shrink:0;font-weight:700}.deadline-person small{display:block;color:#64748b;font-size:11px;margin-top:3px}.deadline-card-footer{border-top:1px solid #edf0f5;padding-top:9px;font-size:11px;color:#526780}.deadline-card-footer small{display:block;margin-top:4px;color:#855610}.deadline-empty{color:#e1e8ff;font-size:12px;text-align:center;border:1px dashed #ffffff35;border-radius:10px;padding:24px 8px}.deadline-board-note{color:#e1e8ff;font-size:12px;line-height:1.6;margin:8px 3px 0}
+@media(max-width:640px){.task-layout-switch{width:100%}.task-layout-switch button{flex:1}.deadline-board{padding:12px}.deadline-column{flex-basis:245px}}
+
+.reminder-detail-backdrop{z-index:100;padding:20px;overscroll-behavior:contain}
+.reminder-detail-dialog{width:min(960px,100%);max-height:calc(100dvh - 40px);overflow-y:auto;margin:0!important;background:#fff;box-shadow:0 24px 80px #0f172a55;border-radius:16px;overscroll-behavior:contain}
+.reminder-detail-dialog>.toolbar-line{position:sticky;top:-1px;z-index:1;background:#fff;padding:12px 0;border-bottom:1px solid #dbe3ee}
+.reminder-detail-dialog .card-actions{display:flex;gap:10px;flex-wrap:wrap;padding-top:16px}
+.reminder-detail-dialog .reminder-detail-grid{overflow-wrap:anywhere}
+@media(max-width:640px){.reminder-detail-backdrop{padding:10px}.reminder-detail-dialog{max-height:calc(100dvh - 20px);padding:14px}.reminder-detail-dialog .card-actions button{flex:1 1 140px}}
+
+.evaluation-warning-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:#0f172a99;padding:20px}.evaluation-warning-backdrop .modal-validation-alert{width:min(560px,100%);margin:0;background:#fff7ed;box-shadow:0 20px 60px #0005;border:2px solid #f59e0b;border-radius:14px;padding:24px}
+
+.deadline-add{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;height:32px;min-height:32px;padding:0;border-radius:6px;font-size:22px;font-weight:600;line-height:1;cursor:pointer;background:transparent;color:#fff;margin:0 0 6px}.deadline-add:hover,.deadline-add:focus-visible{background:#ffffff20;border-color:#fff;outline:2px solid #fff;outline-offset:2px}
+
+.task-area-tabs{margin:0;padding:6px;flex-wrap:wrap}.content-shell>[hidden]{display:none!important}
+.nk-workboard{display:block;width:100%;height:80dvh;border:0;background:white}
+.nk-work-layout{width:min(1620px,100%);height:min(94dvh,1050px);display:grid;grid-template-columns:minmax(0,11fr) minmax(0,9fr);overflow:hidden;background:white;border-radius:14px;box-shadow:0 16px 50px #16355638}
+.nk-work-switch{display:none}.nk-work-fields{overflow:auto;min-width:0;padding:18px}.nk-work-fields>.task-form{width:auto;max-height:none;overflow:visible;padding:0;box-shadow:none}.nk-work-fields .form-actions{position:sticky;bottom:-18px;padding:12px 0;background:white}
+.nk-work-chat{min-width:0;border-left:1px solid #d4e0ea}.nk-work-chat iframe{height:100%;width:100%;border:0;display:block}
+.reminder-detail-dialog:has(.nk-work-layout){width:min(1620px,100%);padding:0;overflow:hidden}.reminder-detail-dialog .nk-work-layout{width:100%;box-shadow:none}
+@media(max-width:800px){.nk-work-layout{grid-template-columns:100%;grid-template-rows:auto minmax(0,1fr);height:90dvh}.nk-work-switch{display:flex;gap:8px;padding:8px;border-bottom:1px solid #dbe3eb}.nk-work-switch button[aria-pressed=true]{background:#204976;color:white}.nk-work-layout[data-chat=false] .nk-work-chat,.nk-work-layout[data-chat=true] .nk-work-fields{display:none}.nk-work-chat{border:0}.nk-work-fields{padding:12px}}
+.nk-account-nav,.nk-native nav{display:flex;flex-wrap:wrap;gap:12px;padding:8px 16px}.nk-native nav{padding:12px 0}.nk-native nav button[aria-pressed=true]{background:#184787;color:white}.nk-native-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:8px;max-height:45vh;overflow:auto}.nk-native-list button,.nk-row-message{display:grid;gap:4px;text-align:left;padding:10px;border:1px solid #d4e2ee;border-radius:8px;background:#f8fbff;color:#183962}.nk-row-message{display:block;max-width:100%;overflow-wrap:anywhere}.nk-thread-dialog{position:fixed;inset:0;width:min(96vw,1500px);height:90dvh;padding:8px;border:0;border-radius:12px}.nk-thread-dialog iframe{display:block;width:100%;height:calc(100% - 40px);border:0}.nk-thread-dialog::backdrop{background:#10253b85}
+
+.nk-new-messages{border-left:5px solid #c63758}.nk-new-messages button{display:grid;gap:5px;text-align:left;width:100%;margin:6px 0;padding:12px;border:1px solid #cfdfec;background:#f2f8fa;border-radius:9px;color:#153757}.nk-new-messages small{color:#476377}.nk-mention,.nk-unread{display:inline-block;width:fit-content;border-radius:6px;padding:4px 7px}.nk-mention{color:#825300;background:#fff1cc}.nk-unread{color:#992744;background:#ffedf1}
+
+.work-task-area,.work-task-list{min-width:0}
+.work-task-area[data-selected=true]{display:grid;grid-template-columns:minmax(0,3fr) minmax(320px,2fr);gap:12px;align-items:start}
+.work-task-chat{position:sticky;top:8px;border:1px solid #c5d6e9;border-radius:12px;overflow:hidden;background:white}
+.work-task-chat header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;color:#18395a}
+.work-task-chat h3{margin:2px 0;overflow-wrap:anywhere}
+.work-task-chat iframe{display:block;width:100%;height:min(68dvh,680px);border:0}
+.deadline-column-cards>div>.deadline-card{width:100%}
+@media(max-width:850px){.work-task-area[data-selected=true]{display:flex;flex-direction:column}.work-task-chat{position:static;order:-1;width:100%;scroll-margin-top:65px}.work-task-list{width:100%}}
+
+.work-inline-editor{scroll-margin-top:70px}.work-inline-editor>.task-form{width:100%;max-width:none;max-height:none;margin:0;overflow:visible;box-shadow:none}
+
+.work-conversation{width:min(97vw,1600px);height:90dvh;max-width:98vw;max-height:96dvh;padding:0;border:1px solid #c6d6e4;border-radius:12px;overflow:hidden;background:white;color:#19334e}
+.work-conversation[open]{display:flex;flex-direction:column}
+.work-conversation::backdrop{background:#16314c77}
+.work-conversation>header{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;gap:.75rem;border-bottom:1px solid #cedbe6}
+.work-conversation h3{margin:0;overflow-wrap:anywhere}
+.work-conversation iframe{border:0;width:100%;flex:1;min-height:0}
+.home-work-inbox{margin:.7rem clamp(.6rem,2vw,2rem);min-width:0}
+.home-work-inbox h2{font-size:1.1rem}.home-work-inbox nav{display:flex;flex-wrap:wrap;gap:.4rem}
+.home-work-inbox nav button{width:auto;padding:4px 10px}.home-work-inbox nav button[aria-pressed=true]{background:#dbeafe}
+.header-work-inbox,.ksnk-signout,.ksnk-chat-launch{border:1px solid #bdd0e1;border-radius:8px;padding:.45rem .7rem;font:600 .9rem system-ui;text-decoration:none;white-space:nowrap}
+.header-work-inbox{background:#edf5ff;color:#173f68}.header-work-inbox b,.ksnk-chat-launch b{display:inline-block;border-radius:1rem;padding:0 .4rem;background:#ba2946;color:white}
+.ksnk-signout{order:6;color:white;background:#21446b;cursor:pointer}
+.ksnk-chat-launch{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));z-index:45;background:#235b9f;color:white;border-radius:2rem;box-shadow:0 3px 9px #233c5c33}
+.header-quick-actions{flex-wrap:wrap}
+@media(max-width:740px){.work-conversation{width:98vw;height:95dvh}.header-work-inbox{font-size:.8rem}.header-quick-actions{width:100%}}
+
+/* KSNK: một cửa sổ chung cho biểu mẫu nghiệp vụ và trò chuyện. */
+.work-dialog-backdrop{z-index:110;padding:clamp(5px,1.5vw,18px)}
+.work-detail-layout{width:min(1460px,99vw);height:min(95dvh,950px);max-height:97dvh;display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0;overflow:hidden;border:1px solid #d1dce9;border-radius:10px;background:#fff;box-shadow:0 22px 55px #0a23454d}
+.work-detail-single{width:min(900px,96vw);max-height:95dvh;overflow:auto;background:#fff;border-radius:12px}
+.work-detail-fields{min-width:0;min-height:0;overflow:auto;border-right:1px solid #cad9e8}
+.work-detail-fields .task-form,.work-detail-single-fields .task-form{width:100%;max-width:none;max-height:none;min-height:100%;padding:16px;overflow:visible;margin:0;box-shadow:none;border-radius:0}
+.work-detail-fields .form-actions{position:sticky;bottom:0;padding:10px 0 4px;background:#fff;z-index:1}
+.work-detail-chat{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:#fff}
+.work-detail-chat>h3{margin:0;min-height:38px;padding:8px 12px;border-bottom:1px solid #dbe5ee;font-size:14px;color:#17375f}
+.work-detail-chat iframe{display:block;border:0;width:100%;flex:1;min-height:0;background:#fff}
+.work-detail-chat-empty{padding:16px;font-size:13px;color:#536980;line-height:1.5}
+@media(max-width:750px){.work-detail-layout{width:98vw;height:94dvh;grid-template-columns:1fr;grid-template-rows:minmax(0,3fr) minmax(180px,2fr)}.work-detail-fields{border-right:0;border-bottom:1px solid #cad9e8}.work-detail-chat>h3{min-height:35px}}
+
+/* Cửa sổ Giao việc, Nhắc việc và Xin phê duyệt: biểu mẫu 60%, trao đổi 40%.
+   Giữ nguyên cuộn dọc riêng biệt, không cho thành phần phê duyệt kéo giãn cột. */
+.work-detail-fields,.work-detail-fields .task-form,
+.work-detail-fields .approval-form,.work-detail-fields .task-approval-record,
+.work-detail-fields .task-approval-evaluation,.work-detail-fields .approval-steps,
+.work-detail-chat{min-width:0;max-width:100%;box-sizing:border-box}
+.work-detail-fields{overflow-x:hidden;overflow-y:auto}
+.work-detail-fields .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.work-detail-fields .form-grid .wide{grid-column:1/-1;min-width:0}
+.work-detail-fields .task-approval-record-grid,
+.work-detail-fields .task-approval-evaluation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-width:100%}
+.work-detail-fields .task-approval-record-grid>*,
+.work-detail-fields .task-approval-evaluation-grid>*,
+.work-detail-fields .task-approval-record-block,
+.work-detail-fields .task-approval-record-head>*,
+.work-detail-fields .task-approval-evaluation-head>*,
+.work-detail-fields .task-approval-record-evidence>*{min-width:0;overflow-wrap:anywhere}
+.work-detail-fields .task-approval-record-head,
+.work-detail-fields .task-approval-evaluation-head{display:flex;flex-wrap:wrap;gap:8px;align-items:start;justify-content:space-between}
+.work-detail-fields .task-approval-record-evidence{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.work-detail-fields .approval-steps ol{max-width:100%;padding-left:1.4rem;overflow-wrap:anywhere}
+.work-detail-fields .task-approval-record p,
+.work-detail-fields .task-approval-record small{white-space:normal;overflow-wrap:anywhere}
+.work-detail-chat iframe{min-width:0}
+@media(max-width:750px){
+ .work-detail-fields .task-approval-record-grid,
+ .work-detail-fields .task-approval-evaluation-grid,
+ .work-detail-fields .task-approval-record-evidence{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:420px){
+ .work-detail-fields .task-approval-record-grid,
+ .work-detail-fields .task-approval-evaluation-grid,
+ .work-detail-fields .task-approval-record-evidence{grid-template-columns:minmax(0,1fr)}
+}
+
+/* Nút Đóng chung cho cửa sổ Giao việc, Nhắc việc và Xin phê duyệt.
+   Nằm ở góc PHẢI trên ngoài hai cột, không chen vào tiêu đề biểu mẫu. */
+.work-detail-layout{position:relative}
+.work-detail-layout .work-dialog-close{
+ position:absolute;top:8px;right:8px;z-index:30;
+ display:flex;align-items:center;justify-content:center;gap:6px;
+ min-width:86px;min-height:44px;padding:7px 12px;
+ border:1px solid #c6d4e3;border-radius:9px;
+ background:#fff;color:#16365e;box-shadow:0 2px 8px rgba(9,35,69,.16);
+ font-size:18px;font-weight:750;line-height:1;cursor:pointer;
+}
+.work-detail-layout .work-dialog-close span{font-size:13px}
+.work-detail-layout .work-dialog-close:hover{background:#eaf2fe;border-color:#2761b7}
+.work-detail-layout .work-dialog-close:focus-visible{outline:3px solid #2761b7;outline-offset:2px}
+.work-detail-layout .work-detail-chat>h3{padding-right:106px}
+@media(max-width:750px){
+ .work-detail-layout .work-dialog-close{top:6px;right:6px;min-height:44px;min-width:76px}
+ .work-detail-layout .work-dialog-close span{font-size:12px}
+}
+
+
+/* Bảng thời hạn: tin nhắn chưa đọc nằm gọn trong đầu thẻ, giống ảnh tham chiếu. */
+.deadline-column-cards>div{position:relative;min-width:0}
+.deadline-column-cards>div:has(>.nk-row-message-compact)>.deadline-card{padding-top:43px;min-height:163px}
+.deadline-column-cards>div>.nk-row-message-compact{
+ position:absolute;top:9px;left:10px;right:10px;z-index:2;
+ width:calc(100% - 20px);max-width:calc(100% - 20px);
+ display:flex;align-items:center;gap:4px;min-height:26px;
+ margin:0;padding:4px 7px;background:#fff0f3;border:1px solid #f4aebc;
+ border-radius:6px;color:#b01d44;font:800 11px/1.25 inherit;
+ text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+ box-shadow:none;cursor:pointer;
+}
+.nk-row-message-compact span{flex:0 0 auto}
+.nk-row-message-compact b{flex:0 0 auto}
+.nk-row-message-compact.is-mentioned{background:#ffe8ec;border-color:#ec8598}
+.nk-row-message-compact:hover{background:#ffe0e8;border-color:#cd3e61}
+.nk-row-message-compact:focus-visible{outline:3px solid #facc15;outline-offset:2px}
+@media(max-width:700px){.deadline-column-cards>div:has(>.nk-row-message-compact)>.deadline-card{padding-top:44px}}
+
+/* Gọn tương tự giao việc, ngày và tin mới hiển thị trực tiếp trên thẻ */
+.deadline-card-footer time{display:block;margin-top:5px;color:#5b7091;font-size:11px;font-weight:750}
+.nk-row-message-compact{font-family:inherit!important;font-size:11px!important;font-weight:800!important;line-height:1.25!important}
+.nk-message-unread-label{overflow:hidden;text-overflow:ellipsis;min-width:0;white-space:nowrap}
+.nk-message-time{margin-left:auto;font-size:10px;color:#9a3450;white-space:nowrap;font-weight:700}
+@media(max-width:750px){.nk-message-time{font-size:9px}}
+@media(max-width:440px){.nk-message-unread-label{font-size:10px}}
+
+/* Nhắc việc: chi tiết cùng cấu trúc Giao việc, giấu minh chứng khi không cần */
+.reminder-compact-detail{border-left:5px solid #174ea6!important;padding:14px!important;margin:10px 0}
+.reminder-compact-head{gap:10px}
+.reminder-compact-head h3{margin:5px 0 3px;font-size:17px}
+.reminder-compact-meta{grid-template-columns:repeat(3,minmax(135px,1fr));gap:8px}
+.reminder-compact-meta span{padding:8px 10px}
+.reminder-evidence-collapse{border-top:1px solid #e3e9f2;margin-top:10px;padding-top:9px}
+.reminder-evidence-collapse summary{cursor:pointer;color:#174ea6;font-size:13px;font-weight:800}
+.reminder-evidence-collapse .reminder-detail-evidence{margin-top:10px}
+.reminder-compact-actions{margin-top:10px}
+@media(max-width:750px){.reminder-compact-meta{grid-template-columns:1fr 1fr}}
+@media(max-width:440px){.reminder-compact-meta{grid-template-columns:1fr}}
+
+/* Unified work editor for notifications, permission-aware but visually identical. */
+.nk-work-edit-fieldset{border:0;padding:0;margin:0;min-width:0;display:block}
+.nk-work-readonly-notice{padding:10px 12px;margin:6px 0 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;font-size:13px;color:#23466d}
+.nk-work-open-error{position:fixed;left:50%;transform:translateX(-50%);top:62px;max-width:min(92vw,750px);z-index:150;display:flex;align-items:center;gap:12px;padding:11px 14px;background:#fff1f2;border:1px solid #fda4af;border-radius:9px;color:#9f1239;box-shadow:0 6px 18px #17274a25}
+.nk-work-open-error button{background:transparent;border:0;font-size:16px;cursor:pointer;color:inherit}
+
+
+/* Một màn hình xin phê duyệt duy nhất: không xếp lớp popup lên biểu mẫu. */
+.work-detail-fields .form-actions .task-request-approval-btn{margin-right:auto;background:#fff4d9;color:#855209;border:1px solid #e9c16b;border-radius:8px;font-size:12px;font-weight:900;white-space:nowrap}
+.work-detail-fields .form-actions .task-request-approval-btn:hover{background:#ffe9ac}
+.task-approval-chip{display:inline-flex;align-items:center;margin-right:auto;padding:8px 10px;color:#7c4a13;background:#fff6e5;border:1px solid #f2d49e;border-radius:7px;font-size:12px;font-weight:800}
+.task-approval-manager-hint{display:block;font-size:11px;color:#536477;margin-top:5px;line-height:1.4}
+.task-approval-manager-error{display:block;font-size:12px;color:#b42318;background:#fff1f0;border:1px solid #ffc6bf;border-radius:6px;padding:8px;margin-top:6px;line-height:1.4}
+.work-detail-fields .form-actions{flex-wrap:wrap}
+@media(max-width:760px){.work-detail-fields .form-actions .task-request-approval-btn{flex-basis:100%;margin:0}}
+
+/* Phê duyệt: nhãn trạng thái trở thành phím tắt có thể nhấn, không ghi dữ liệu. */
+.task-approval-shortcut{gap:7px;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap;text-align:left}
+.task-approval-shortcut:hover:not(:disabled){background:#fde8b8;border-color:#d99d40}
+.task-approval-shortcut:focus-visible{outline:3px solid #2563eb;outline-offset:2px}
+.task-approval-shortcut:disabled{opacity:.55;cursor:not-allowed}
+.task-approval-shortcut span{font-size:18px;line-height:10px}
+.task-approval-view-note{background:#f0f6ff;border:1px solid #bfd8f5;border-radius:8px;color:#244a75;padding:10px 12px;font-size:13px;line-height:1.5;margin:5px 0 12px}
+
+/* Cùng một cửa sổ, quản lý đủ quyền chuyển sang chế độ duyệt của tác vụ. */
+.task-approval-review-note{background:#effaf3;border:1px solid #a8d8b5;border-radius:8px;color:#1c6035;padding:10px 12px;font-size:13px;line-height:1.45;margin:5px 0 12px}
+
+
+/* Production-safe visual-only release: allow the homepage and work modules
+   to reclaim the entire available viewport when the sidebar is collapsed. */
+.home-screen-fluid .app-main,.work-screen-fluid .app-main{min-width:0;width:auto;max-width:none}
+.home-screen-fluid.menu-is-closed .app-main,
+.work-screen-fluid.menu-is-closed .app-main{margin-left:0}
+.home-screen-fluid .app-main>main.content-shell,
+.work-screen-fluid .app-main>main{width:100%;max-width:none;min-width:0;box-sizing:border-box}
+.home-screen-fluid .app-main>main.content-shell{margin:0;padding-left:clamp(12px,1.4vw,24px);padding-right:clamp(12px,1.4vw,24px)}
+.home-screen-fluid .home-alerts-first{width:100%;max-width:none;min-width:0;margin-left:0;margin-right:0;box-sizing:border-box}
+.home-screen-fluid .home-alerts-first .home-alerts-heading,
+.home-screen-fluid .home-alerts-first .home-alert-filter-bar{min-width:0;max-width:100%}
+.work-screen-fluid .app-main>main>.module-toolbar,
+.work-screen-fluid .app-main>main>.work-task-area,
+.work-screen-fluid .app-main>main>.work-task-area>.work-task-list,
+.work-screen-fluid .app-main>main>.work-task-area>.work-task-list>.content-shell{
+ width:100%;max-width:none;min-width:0;margin-left:0;margin-right:0;box-sizing:border-box
+}
+.work-screen-fluid .app-main>main>.work-task-area>.work-task-list>.content-shell{
+ padding-left:clamp(12px,1.4vw,24px);padding-right:clamp(12px,1.4vw,24px)
+}
+@media(max-width:900px){
+ .home-screen-fluid.menu-is-open .app-main,.work-screen-fluid.menu-is-open .app-main{margin-left:0}
+ .home-screen-fluid .app-main>main.content-shell,
+ .work-screen-fluid .app-main>main>.work-task-area>.work-task-list>.content-shell{padding-left:10px;padding-right:10px}
+}
