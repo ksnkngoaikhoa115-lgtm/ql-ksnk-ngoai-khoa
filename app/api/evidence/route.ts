@@ -150,13 +150,13 @@ export async function GET(req:Request){
    const id=u.searchParams.get('id');const reference=u.searchParams.get('reference');
    let query=db.from('ksnk_evidence').select('id,file_name,storage_path,mime_type,module,legacy_id');
    if(id)query=query.eq('id',id);
-   else if(reference){const path=evidenceStoragePath(reference,effectiveSupabaseUrl(),BUCKET);if(!path)return NextResponse.json({ok:false,error:'Liên kết không thuộc kho minh chứng của hệ thống.'},{status:400});query=query.eq('storage_path',path);}
+   else if(reference){const path=evidenceStoragePath(reference,effectiveSupabaseUrl(),BUCKET)||evidenceStoragePath(reference,'https://qmhvdedsztmuplfmsrqz.supabase.co',BUCKET);if(!path)return NextResponse.json({ok:false,error:'Liên kết không thuộc kho minh chứng của hệ thống.'},{status:400});query=query.eq('storage_path',path);}
    else return NextResponse.json({ok:false,error:'Thiếu mã tệp.'},{status:400});
    const {data:records,error:lookupError}=await query.limit(1);if(lookupError)throw lookupError;
    const record=records?.[0];if(!record)return NextResponse.json({ok:false,error:'Không tìm thấy tệp minh chứng hoặc tệp đã bị xóa.'},{status:404});
    if(!await evidenceAllowed(user,record.module,record.legacy_id))return NextResponse.json({ok:false,error:'Minh chứng ngoài phạm vi bộ phận'},{status:403});
    const {data:file,error:downloadError}=await db.storage.from(BUCKET).download(record.storage_path);
-   if(downloadError||!file)throw new Error('Không tải được tệp minh chứng. '+(downloadError?.message||''));
+   if(downloadError||!file){const status=String((downloadError as any)?.statusCode||(downloadError as any)?.status||'');const message=downloadError?.message||'';if(status==='404'||/not found|does not exist/i.test(message))return NextResponse.json({ok:false,error:'Có bản ghi minh chứng nhưng không tìm thấy tệp trong Storage. Cần khôi phục tệp gốc.'},{status:404});return NextResponse.json({ok:false,error:'Không tải được tệp minh chứng từ Storage.'},{status:503});}
    const inline=['image/jpeg','image/png','image/webp','application/pdf'].includes(record.mime_type);
    return new Response(file.stream(),{headers:{'Content-Type':record.mime_type||'application/octet-stream','Content-Disposition':`${inline?'inline':'attachment'}; filename="${safeName(record.file_name)}"; filename*=UTF-8''${encodeURIComponent(record.file_name).replace(/'/g,'%27')}`,'Cache-Control':'private, no-store, max-age=0','X-Content-Type-Options':'nosniff'}});
   }

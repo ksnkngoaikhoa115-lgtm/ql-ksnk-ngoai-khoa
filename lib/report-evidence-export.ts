@@ -8,7 +8,8 @@ export function reportPhotoCandidates(card:HTMLElement):ReportPhoto[]{
  const links=card.querySelectorAll<HTMLAnchorElement>('a.report-image-preview, a.report-evidence-link, .evidence-item a')
  for(const link of Array.from(links)){
   if(!link.getClientRects().length||getComputedStyle(link).visibility==='hidden')continue
-  const url=new URL(link.getAttribute('href')||'',window.location.origin)
+  const href=link.getAttribute('href');if(!href)continue
+  const url=new URL(href,window.location.origin)
   if(url.origin!==window.location.origin||url.pathname!=='/api/evidence'||url.searchParams.get('open')!=='1')continue
   const image=link.querySelector('img')
   const label=(link.textContent||'').trim()

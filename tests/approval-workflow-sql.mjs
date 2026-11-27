@@ -12,7 +12,7 @@ create table nk_role_permission_defaults(role text,grants jsonb);
 create function cx_key(v text) returns text language sql immutable as $$select lower(regexp_replace(trim(coalesce(v,'')),'[[:space:]]+',' ','g'))$$;
 create view cx_staff_catalog as select id as source_id,'surgery'::text as unit,cx_key(data->>'Mã NV') code,count(*) over(partition by data->>'Mã NV') copies from ksnk_legacy_rows where sheet_name='DM_NHANVIEN';
 create function nk_work_scope(cx_people,cx_threads) returns boolean language sql stable as $$select $1.active and $1.unit='surgery'$$;
-create function nk_work_feature_scope(p cx_people,k text,a text) returns text language sql stable as $$select case when p.legacy_operator or p.admin then 'hospital' when p.team_lead then 'team' else 'self' end$$;
+create function nk_work_feature_scope(a cx_people,feature text,action text) returns text language sql stable as $$select case when a.legacy_operator or a.admin then 'hospital' when a.team_lead then 'team' else 'self' end$$;
 create table fake_messages(thread uuid,sender uuid,body text,request_id uuid,unique(thread,sender,request_id));
 create function cx_append(t uuid,who uuid,txt text,attachments jsonb,rid uuid) returns void language sql as $$insert into fake_messages values(t,who,txt,rid) on conflict do nothing$$;
 `);

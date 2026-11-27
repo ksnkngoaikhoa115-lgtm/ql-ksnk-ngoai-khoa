@@ -448,11 +448,12 @@ function ScriptChecklistView({payload,onCreateChecklist,onCreateForm,onCreateCri
 function reportField(row:AnyRecord,column:string){return row[column]??row.data?.[column];}
 function reportEvidenceId(row:AnyRecord,module:string){if(module==='tasks')return row.taskId||row.id||row.legacy_id||row.row_no;if(module==='plans')return row.id||row.legacy_id||row.row_no;if(module==='issues')return row.id||row.legacy_id||row.row_no;if(module==='violations')return row.id||row.legacy_id||row.row_no;return row.id||row.legacy_id||row.row_no;}
 function ReportImageThumbnail({url,name}:{url:string;name:string}){
- const [failed,setFailed]=useState(false);
- return <a className="report-image-preview" href={url} target="_blank" rel="noopener noreferrer" title={'Mở ảnh đầy đủ: '+name}>
-  {failed?<span className="report-image-failed">Ảnh không tải được · Mở ảnh</span>:<img src={url} alt={name||'Ảnh minh chứng'} loading="lazy" decoding="async" onError={()=>setFailed(true)}/>}
-  <small>{name||'Xem ảnh đầy đủ'}</small>
- </a>;
+ const [failed,setFailed]=useState(false),[reason,setReason]=useState(''),[attempt,setAttempt]=useState(0);
+ useEffect(()=>{setFailed(false);setReason('');setAttempt(0)},[url]);
+ async function diagnose(){setFailed(true);setReason('Đang kiểm tra tệp…');try{const r=await fetch(url,{cache:'no-store',credentials:'same-origin'});if(r.ok){setReason('Tệp có thể tải được nhưng trình duyệt không hiển thị ảnh.');return}const j=await r.json().catch(()=>({}));setReason(r.status===403?'Không đủ quyền xem ảnh.':r.status===401?'Phiên đăng nhập đã hết hạn.':j.error||'Không tải được tệp ('+r.status+').')}catch{setReason('Không kết nối được máy chủ minh chứng.')}}
+ return <span className="report-evidence-thumbnail"><a className="report-image-preview" href={url} target="_blank" rel="noopener noreferrer" title={'Mở ảnh đầy đủ: '+name}>
+  {failed?<span className="report-image-failed">Ảnh chưa hiển thị<small>{reason||'Kiểm tra tệp minh chứng'}</small></span>:<img key={attempt} src={url} alt={name||'Ảnh minh chứng'} loading="lazy" decoding="async" onError={()=>void diagnose()}/>}
+  <small>{name||'Xem ảnh đầy đủ'}</small></a>{failed&&<div className="report-image-error-actions"><button type="button" className="edit-btn" onClick={()=>{setReason('');setFailed(false);setAttempt(x=>x+1)}}>Thử lại</button><a className="report-evidence-link" href={url} target="_blank" rel="noopener noreferrer">Mở tệp gốc</a></div>}</span>;
 }
 function ReportEvidence({value,legacyId,kind,module='checklists',emptyLabel,allowDelete=false}:{value?:any;legacyId?:any;kind:'image'|'document';module?:string;emptyLabel?:string;allowDelete?:boolean}){
  const reference=text(value);

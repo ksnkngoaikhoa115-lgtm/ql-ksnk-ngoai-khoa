@@ -84,8 +84,8 @@ function getNotes(card:HTMLElement){
   .map(el=>shortened(cellText(el),175)).filter(x=>x.length>2)
  return [...new Set(notes)].slice(0,36)
 }
-function addChartPages(pptx:any,card:HTMLElement,heading:string,scope:string,period:string,inc:()=>number){
- const snapshots=captureVisibleReportCharts(card,heading)
+function addChartPages(pptx:any,card:HTMLElement,heading:string,scope:string,period:string,inc:()=>number,selectedCharts?:Set<number>){
+ const snapshots=captureVisibleReportCharts(card,heading).filter((_,index)=>!selectedCharts||selectedCharts.has(index))
  for(const snapshot of snapshots){
   const slide=sectionSlide(pptx,heading,scope,period,inc())
   write(slide,shortened(snapshot.title,100),.73,2.24,11.8,.40,17,BLUE,true)
@@ -116,23 +116,23 @@ function addChartPages(pptx:any,card:HTMLElement,heading:string,scope:string,per
  * Two photographs per page keep the layout legible on 16:9 meeting screens.
  */
 function addEvidenceSlide(pptx:any,heading:string,scope:string,period:string,
- images:Array<{photo:ReportPhoto;data:string;ratio:number}>,inc:()=>number){
+ images:Array<{photo:ReportPhoto;data:string;ratio:number}>,inc:()=>number,layout:1|2|4){
  const slide=sectionSlide(pptx,heading+' · ẢNH MINH CHỨNG',scope,period,inc())
  write(slide,'ẢNH MINH CHỨNG THỰC TẾ',.73,2.27,10.7,.3,16,BLUE,true)
+ const cols=layout===1?1:2,rows=layout===4?2:1,gap=.16,totalW=11.91,totalH=3.96,top=2.69;
+ const boxWidth=(totalW-(cols-1)*gap)/cols,boxHeight=(totalH-(rows-1)*gap)/rows;
  images.forEach(({photo,data,ratio},i)=>{
-  const x=.71+i*6.04,boxWidth=5.89,photoHeight=3.40,top=2.74
-  slide.addShape(pptx.ShapeType.roundRect,{x,y:top,w:boxWidth,h:3.85,
-   rectRadius:.09,line:{color:'D5E2F1',width:1},fill:{color:'F8FAFD'}})
-  const fitted=fitChartImage(ratio,boxWidth-.36,photoHeight-.28)
-  slide.addImage({data,x:x+(boxWidth-fitted.w)/2,y:top+.12+(photoHeight-.28-fitted.h)/2,
-   w:fitted.w,h:fitted.h})
-  write(slide,shortened(photo.title,93),x+.18,6.20,boxWidth-.36,.25,11,INK,true)
-  if(photo.context)write(slide,shortened(photo.context,90),x+.18,6.48,boxWidth-.36,.17,9,GREY)
+  const x=.71+(i%cols)*(boxWidth+gap),y=top+Math.floor(i/cols)*(boxHeight+gap),captionH=rows===2?.50:.68;
+  slide.addShape(pptx.ShapeType.roundRect,{x,y,w:boxWidth,h:boxHeight,rectRadius:.09,line:{color:'D5E2F1',width:1},fill:{color:'F8FAFD'}});
+  const availH=boxHeight-captionH-.16,fitted=fitChartImage(ratio,boxWidth-.24,availH);
+  slide.addImage({data,x:x+(boxWidth-fitted.w)/2,y:y+.08+(availH-fitted.h)/2,w:fitted.w,h:fitted.h});
+  write(slide,shortened(photo.title,layout===4?74:125),x+.12,y+boxHeight-captionH,boxWidth-.24,captionH*.57,layout===4?10:12,INK,true);
+  if(photo.context)write(slide,shortened(photo.context,90),x+.12,y+boxHeight-captionH*.39,boxWidth-.24,captionH*.29,9,GREY);
  })
 }
 async function addEvidencePages(pptx:any,card:HTMLElement,heading:string,scope:string,period:string,
- maxImages:number,inc:()=>number){
- const candidates=reportPhotoCandidates(card)
+ maxImages:number,inc:()=>number,layout:1|2|4,excluded:Set<string>){
+ const candidates=reportPhotoCandidates(card).filter(photo=>!excluded.has(photo.url))
  const loaded:Array<{photo:ReportPhoto;data:string;ratio:number}>=[]
  const errors:string[]=[]
  for(const photo of candidates.slice(0,maxImages)){
@@ -143,7 +143,7 @@ async function addEvidencePages(pptx:any,card:HTMLElement,heading:string,scope:s
    errors.push(shortened(photo.title,70)+': '+(err instanceof Error?err.message:'Không tải được'))
   }
  }
- for(let i=0;i<loaded.length;i+=2)addEvidenceSlide(pptx,heading,scope,period,loaded.slice(i,i+2),inc)
+ for(let i=0;i<loaded.length;i+=layout)addEvidenceSlide(pptx,heading,scope,period,loaded.slice(i,i+layout),inc,layout)
  return {count:loaded.length,skipped:Math.max(0,candidates.length-maxImages),errors}
 }
 function addTablePages(pptx:any,heading:string,scope:string,period:string,table:{columns:string[];rows:string[][]},limit:number,inc:()=>number){
@@ -172,13 +172,16 @@ function addTablePages(pptx:any,heading:string,scope:string,period:string,table:
 export default function ScreenReportExport({root,regions,scope,period,canExport}:{
  root:RefObject<HTMLDivElement|null>;regions:Region[];scope:string;period:string;canExport:boolean
 }){
- const [region,setRegion]=useState(''),[mode,setMode]=useState<ExportMode>('summary'),[includePhotos,setIncludePhotos]=useState(true)
+ const [chosenRegions,setChosenRegions]=useState<string[]|null>(null),[mode,setMode]=useState<ExportMode>('summary'),[includePhotos,setIncludePhotos]=useState(true)
+ const [includeCharts,setIncludeCharts]=useState(true),[includeTables,setIncludeTables]=useState(true),[includeOverview,setIncludeOverview]=useState(true),[photoLayout,setPhotoLayout]=useState<1|2|4>(2)
+ const [preview,setPreview]=useState(false),[previewCharts,setPreviewCharts]=useState<Array<{key:string;region:string;index:number;title:string;png:string}>>([]),[previewPhotos,setPreviewPhotos]=useState<ReportPhoto[]>([]),[excludedCharts,setExcludedCharts]=useState<string[]>([]),[excludedPhotos,setExcludedPhotos]=useState<string[]>([])
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('')
- const active=regions.some(r=>r.id===region)?region:''
+ const selectedIds=new Set(chosenRegions===null?regions.map(r=>r.id):chosenRegions.filter(id=>regions.some(r=>r.id===id)))
+ const getTargets=()=>Array.from(root.current?.querySelectorAll<HTMLElement>('[data-report-region]')||[]).filter(card=>shown(card)&&selectedIds.has(card.dataset.reportRegion||''))
+ function inspect(){try{const charts:Array<{key:string;region:string;index:number;title:string;png:string}>=[],photos=new Map<string,ReportPhoto>();for(const card of getTargets()){const id=card.dataset.reportRegion||'';const title=regions.find(r=>r.id===id)?.label||'Biểu đồ';if(includeCharts)captureVisibleReportCharts(card,title).forEach((s,index)=>charts.push({key:id+':'+index,region:id,index,title:s.title,png:s.png}));if(includePhotos)reportPhotoCandidates(card).forEach(p=>photos.set(p.url,p));}setPreviewCharts(charts);setPreviewPhotos([...photos.values()]);setExcludedCharts([]);setExcludedPhotos([]);setPreview(true);setError('')}catch(e){setError(e instanceof Error?e.message:'Không tải được bản xem trước')}}
  async function download(){
   if(!canExport||!root.current||busy)return
-  const targets=Array.from(root.current.querySelectorAll<HTMLElement>('[data-report-region]'))
-   .filter(card=>shown(card)&&(!active||card.dataset.reportRegion===active))
+  const targets=getTargets()
   if(!targets.length){setError('Chưa có vùng báo cáo đang hiển thị để xuất.');return}
   setBusy(true);setError('');setNotice('')
   try{
@@ -200,7 +203,7 @@ export default function ScreenReportExport({root,regions,scope,period,canExport}
    write(cover,'Dữ liệu theo kỳ, bộ phận và nội dung đã chọn',2.0,5.58,9.34,.29,12,GREY,false,'center')
 
    const stats=root.current.querySelector('.summary-cards')
-   if(stats&&shown(stats as HTMLElement)){
+   if(includeOverview&&stats&&shown(stats as HTMLElement)){
     const tiles=Array.from(stats.children).slice(0,6).map(el=>({
      value:shortened(el.querySelector('b')?.textContent,20),
      label:shortened(el.querySelector('span')?.textContent,56)
@@ -219,14 +222,15 @@ export default function ScreenReportExport({root,regions,scope,period,canExport}
    for(const card of targets){
     const item=regions.find(r=>r.id===card.dataset.reportRegion)
     const heading=item?.label||card.querySelector('h3')?.textContent||'Nội dung giám sát KSNK'
-    chartCount+=addChartPages(pptx,card,heading,scope,period,next)
+    if(includeCharts){const id=card.dataset.reportRegion||'';const all=captureVisibleReportCharts(card,heading);const keep=new Set(all.map((_,i)=>i).filter(i=>!excludedCharts.includes(id+':'+i)));chartCount+=addChartPages(pptx,card,heading,scope,period,next,keep)}
     if(includePhotos){
-     const photos=await addEvidencePages(pptx,card,heading,scope,period,remainingPhotos,next)
+     const photos=await addEvidencePages(pptx,card,heading,scope,period,remainingPhotos,next,photoLayout,new Set(excludedPhotos))
      remainingPhotos=Math.max(0,remainingPhotos-photos.count)
      photoCount+=photos.count
      omitted+=photos.skipped
      photoWarnings.push(...photos.errors)
     }
+    if(!includeTables)continue;
     const tables=getTables(card)
     if(tables.length){
      let budget=limit
@@ -254,8 +258,9 @@ export default function ScreenReportExport({root,regions,scope,period,canExport}
    }
    if(omitted){
     const s=sectionSlide(pptx,'GHI CHÚ GIỚI HẠN TRÌNH CHIẾU',scope,period,next())
-    fillEmpty(s,'Có '+omitted+' dòng ngoài giới hạn '+limit+' dòng/mục; xem đầy đủ trong hệ thống.',pptx)
+    fillEmpty(s,'Có '+omitted+' dòng hoặc ảnh ngoài giới hạn trình chiếu; xem đầy đủ trong hệ thống.',pptx)
    }
+   if(photoWarnings.length){const s=sectionSlide(pptx,'MINH CHỨNG CHƯA TẢI ĐƯỢC',scope,period,next());write(s,'Có '+photoWarnings.length+' ảnh không thể đưa vào PowerPoint.',.8,2.45,11.7,.45,21,RED,true);photoWarnings.slice(0,5).forEach((warning,i)=>write(s,warning,.85,3.1+i*.58,11.5,.48,13,GREY));}
    const fileName='Bao-cao-KSNK-'+fileSafe(period)+'-'+mode+'.pptx'
    await pptx.writeFile({fileName})
    setNotice('Đã tạo '+pages+' slide, '+chartCount+' biểu đồ và '+photoCount+' ảnh minh chứng. '+
@@ -267,17 +272,16 @@ export default function ScreenReportExport({root,regions,scope,period,canExport}
  return <section className="panel-card screen-export" aria-label="Xuất PowerPoint theo nội dung đang hiển thị">
   <div><strong>XUẤT BÁO CÁO POWERPOINT · 16:9</strong><small>Biểu đồ, chỉ số và bảng trong vùng đã chọn · {scope} · {formatPeriod(period)} · Chỉ xuất các mục đã chọn, trong quyền được xem</small></div>
   <div className="screen-export-controls">
-   <label>Vùng xuất<select value={active} onChange={e=>setRegion(e.target.value)} disabled={busy}>
-    <option value="">Tất cả mục đang hiển thị ({regions.length})</option>
-    {regions.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}
-   </select></label>
-   <label>Chế độ trình chiếu<select value={mode} onChange={e=>setMode(e.target.value as ExportMode)} disabled={busy}>
-    <option value="summary">Gọn · 12 dòng/mục</option>
-    <option value="detailed">Chi tiết · 60 dòng/mục</option>
-   </select></label>
-   <label className="screen-export-photos"><input type="checkbox" checked={includePhotos} onChange={e=>setIncludePhotos(e.target.checked)} disabled={busy}/> Kèm ảnh minh chứng</label>
-   <button type="button" className="add-btn" disabled={!canExport||busy||!regions.length} onClick={download}>{busy?'ĐANG TẠO POWERPOINT…':'⇩ XUẤT POWERPOINT (.PPTX)'}</button>
+   <details className="report-export-section-picker"><summary>Vùng xuất · {selectedIds.size}/{regions.length} mục</summary><div className="report-export-pick-list">
+    <div className="report-export-pick-actions"><button type="button" className="edit-btn" onClick={()=>{setChosenRegions(null);setPreview(false)}} disabled={busy}>Chọn tất cả</button><button type="button" className="filter-reset" onClick={()=>{setChosenRegions([]);setPreview(false)}} disabled={busy}>Bỏ chọn</button></div>
+    {regions.map(r=><label key={r.id}><input type="checkbox" checked={selectedIds.has(r.id)} disabled={busy} onChange={e=>{const next=new Set(selectedIds);if(e.target.checked)next.add(r.id);else next.delete(r.id);setChosenRegions([...next]);setPreview(false);setExcludedCharts([]);setExcludedPhotos([])}}/> {r.label}</label>)}
+   </div></details>
+   <label>Chế độ trình chiếu<select value={mode} onChange={e=>setMode(e.target.value as ExportMode)} disabled={busy}><option value="summary">Gọn · 12 dòng/mục</option><option value="detailed">Chi tiết · 60 dòng/mục</option></select></label>
+   <label>Bố cục ảnh trên slide<select value={photoLayout} disabled={busy||!includePhotos} onChange={e=>setPhotoLayout(Number(e.target.value) as 1|2|4)}><option value={1}>1 ảnh lớn</option><option value={2}>2 ảnh cân đối</option><option value={4}>4 ảnh dạng lưới</option></select></label>
+   <div className="report-export-options">{([['Tổng quan',includeOverview,setIncludeOverview],['Biểu đồ',includeCharts,setIncludeCharts],['Bảng / ghi chú',includeTables,setIncludeTables],['Ảnh minh chứng',includePhotos,setIncludePhotos]] as const).map(([label,checked,change])=><label key={label} className="screen-export-photos"><input type="checkbox" checked={checked} disabled={busy} onChange={e=>{change(e.target.checked);setPreview(false);setExcludedCharts([]);setExcludedPhotos([])}}/> {label}</label>)}</div>
+   <div className="report-export-buttons"><button type="button" className="edit-btn" disabled={busy||!selectedIds.size} onClick={inspect}>XEM TRƯỚC / CHỌN BIỂU ĐỒ &amp; ẢNH</button><button type="button" className="add-btn" disabled={!canExport||busy||!selectedIds.size||!(includeOverview||includeCharts||includeTables||includePhotos)} onClick={download}>{busy?'ĐANG TẠO POWERPOINT…':'⇩ XUẤT POWERPOINT (.PPTX)'}</button></div>
   </div>
+  {preview&&<div className="report-export-preview"><div className="report-export-preview-head"><div><strong>Xem trước nội dung trình chiếu</strong><small>16:9 · {previewCharts.length-excludedCharts.length} biểu đồ · {previewPhotos.length-excludedPhotos.length} ảnh được chọn; xuất theo giới hạn và quyền hiện tại. Bản xem trước lấy dữ liệu đang hiển thị.</small></div><button type="button" className="filter-reset" onClick={()=>setPreview(false)}>Đóng</button></div><div className="report-export-preview-grid"><div className="report-export-slide-thumb"><b>BÁO CÁO CÔNG TÁC KSNK</b><span>{formatPeriod(period)}</span><span>{scope}</span></div>{previewCharts.map(c=><label key={c.key} className="report-export-preview-card"><input type="checkbox" checked={!excludedCharts.includes(c.key)} disabled={busy} onChange={e=>setExcludedCharts(previous=>e.target.checked?previous.filter(k=>k!==c.key):[...previous,c.key])}/><b>{c.title}</b><img src={c.png} alt={c.title}/></label>)}{previewPhotos.map(p=><label key={p.url} className="report-export-preview-card"><input type="checkbox" checked={!excludedPhotos.includes(p.url)} disabled={busy} onChange={e=>setExcludedPhotos(previous=>e.target.checked?previous.filter(k=>k!==p.url):[...previous,p.url])}/><b>{p.title}</b><img src={p.url} alt={p.filename} loading="lazy" onError={e=>{e.currentTarget.style.display='none'}}/><small>{p.context}</small></label>)}</div></div>}
   {!canExport&&<p role="status">Chưa được cấp quyền xuất báo cáo. Quản trị viên có thể bật quyền trong Cài đặt → Phân quyền báo cáo.</p>}{error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
  </section>
 }
