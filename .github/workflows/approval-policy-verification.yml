@@ -16,5 +16,7 @@ jobs:
           node-version: '24'
       - run: npm ci
       - run: node tests/approval-workflow-policy.mjs
+      - run: node tests/approval-workflow-sql.mjs
       - run: npm run typecheck
       - run: npm test
+      - run: npm run build
