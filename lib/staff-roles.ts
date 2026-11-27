@@ -1,10 +1,10 @@
-export const STAFF_POSITIONS=['Trưởng khoa','Điều dưỡng trưởng','Tổ trưởng','Nhân viên'] as const;
+export const STAFF_POSITIONS=['Trưởng khoa','Phó khoa','Điều dưỡng trưởng','Tổ trưởng','Nhân viên'] as const;
 export const STAFF_EMPLOYMENT_STATUSES=['Đang làm việc','Đã nghỉ việc'] as const;
 export type AccountWorkRole='chief'|'team'|'staff';
 const n=(v:unknown)=>String(v??'').trim().toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/\s+/g,' ');
 export function staffPosition(value:unknown):string{
  const v=n(value);const synonyms:Record<string,string>={
-  'truong khoa':'Trưởng khoa','dieu duong truong':'Điều dưỡng trưởng','dd truong':'Điều dưỡng trưởng',
+  'truong khoa':'Trưởng khoa','pho khoa':'Phó khoa','dieu duong truong':'Điều dưỡng trưởng','dd truong':'Điều dưỡng trưởng',
   'to truong':'Tổ trưởng','to truong bo phan':'Tổ trưởng',
   'nhan vien':'Nhân viên','nv':'Nhân viên','ho ly':'Nhân viên',
   'xu ly dung cu':'Nhân viên','dung cu':'Nhân viên',
@@ -23,5 +23,6 @@ export function roleForStaffPosition(value:unknown):AccountWorkRole|null{
  const position=staffPosition(value);return !position?null:['Trưởng khoa','Điều dưỡng trưởng'].includes(position)?'chief':position==='Tổ trưởng'?'team':'staff';
 }
 export function roleAllowedByPosition(role:AccountWorkRole,position:unknown):boolean{
- const expected=roleForStaffPosition(position);return Boolean(expected&&(role==='staff'||role===expected));
+ const expected=roleForStaffPosition(position);if(staffPosition(position)==='Phó khoa')return ['staff','team','chief'].includes(role);
+ return Boolean(expected&&(role==='staff'||role===expected));
 }
