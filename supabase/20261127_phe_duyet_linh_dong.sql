@@ -91,7 +91,7 @@ end $$;
 create or replace function public.nk_work_decision_v2(who uuid,work_id uuid,rid uuid,operation text,reviewer uuid,note text,expected text,expected_revision int,evaluation text default null)
 returns boolean language plpgsql set search_path=public as $$
 declare t public.cx_threads;a public.cx_people;m public.cx_people;r public.ksnk_legacy_rows;d jsonb;h jsonb;ctx jsonb;prior jsonb;event jsonb;
- st text;new_state text;v int;target uuid;recipients uuid[];old_reviewer uuid;old_requester uuid;assigned uuid;label text;kind text;message text;
+ st text;new_state text;v int;target uuid;recipients uuid[];old_reviewer uuid;old_requester uuid;assigned uuid;label text;event_kind text;message text;
 begin
  if rid is null or operation not in ('request','approve','forward','consult','supplement','reject','reopen') or note is null or length(note)>2000 then return false;end if;
  note=trim(note);
@@ -144,8 +144,8 @@ begin
  recipients=case when operation='request' then array[assigned] else array_append(array_append(array_append(coalesce(t.performers,'{}'::uuid[]),coalesce(t.source_creator_id,t.owner_id)),old_requester),case when operation in ('forward','consult') then assigned else null end) end;
  for target in select distinct x from unnest(recipients) x where x is not null and x<>who loop
  if exists(select 1 from public.cx_people p where p.id=target and p.active and public.nk_work_scope(p,t)) then
- kind=case when new_state='CHỜ PHÊ DUYỆT' and target=assigned then 'CHỜ PHÊ DUYỆT' when operation in ('forward','consult') then label else new_state end;
- insert into public.nk_work_events(thread,sender,recipient,request_id,kind,body) values(t.id,who,target,rid,kind,left(note,180)) on conflict do nothing;
+ event_kind=case when new_state='CHỜ PHÊ DUYỆT' and target=assigned then 'CHỜ PHÊ DUYỆT' when operation in ('forward','consult') then label else new_state end;
+ insert into public.nk_work_events(thread,sender,recipient,request_id,kind,body) values(t.id,who,target,rid,event_kind,left(note,180)) on conflict do nothing;
  end if;
  end loop;
  message=label||' · '||a.name||' — '||coalesce(ctx->>'actorPosition','')||case when operation in ('request','forward','consult') then E'\nĐến: '||m.name||' — '||coalesce(public.nk_approval_position(m),'') else '' end||E'\n'||note;
