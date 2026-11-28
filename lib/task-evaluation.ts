@@ -5,3 +5,6 @@ export function requireManagerEvaluation(previous:unknown,status:unknown,evaluat
 
 /** A saved substantive management rating closes employee progress; redo remains actionable. */
 export function evaluationCompletesTask(value:unknown){return ['XUẤT SẮC','TỐT','KHÁ','TRUNG BÌNH','KÉM'].includes(String(value||'').trim().toUpperCase());}
+
+/** Effective display state; the underlying approved record remains untouched. */
+export function effectiveTaskCompleted(data:Record<string,unknown>){const approval=String(data['Trạng thái phê duyệt']||data['Trạng thái xin ý kiến']||'').trim().toUpperCase();return approval==='ĐÃ PHÊ DUYỆT'||(!['TỪ CHỐI','YÊU CẦU BỔ SUNG'].includes(approval)&&evaluationCompletesTask(data['Đánh giá quản lý']||data['Đánh giá quản lý hiện tại']||data['Đánh giá']))||employeeCompleted(data['Trạng thái NV']||data['Trạng thái nhân viên']||data['Trạng thái']);}

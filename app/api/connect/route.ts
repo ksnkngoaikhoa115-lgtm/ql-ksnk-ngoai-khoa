@@ -1,3 +1,4 @@
+import {effectiveTaskCompleted} from '../../../lib/task-evaluation';
 import {managedDepartments,managesDepartment} from '../../../lib/feature-permissions';
 import {staffPosition,staffEmploymentStatus,roleAllowedByPosition} from '../../../lib/staff-roles';
 import {actor,db,personFields,Person} from '../../../lib/auth';
@@ -160,7 +161,7 @@ async function dispatch(req:Request){
  const sources=new Map(fields.map(row=>[Number(row.id),row.data as Record<string,string>]));
  return page.map(row=>{
   const source=sources.get(Number(row.item.source_row));
-  return {...row,item:{...row.item,...byId.get(String(row.item.id)),lead:source?.['Phụ trách chính']||'',deadline:source?.['Hạn hoàn thành']||''}};
+  return {...row,item:{...row.item,...byId.get(String(row.item.id)),...(b.kind==='task'&&source&&effectiveTaskCompleted(source)?{status:'Hoàn thành'}:{}),lead:source?.['Phụ trách chính']||'',deadline:source?.['Hạn hoàn thành']||''}};
  });
  }
  if(b.action==='board'){
@@ -168,7 +169,12 @@ async function dispatch(req:Request){
  const [due,rows,badges,latest]=await Promise.all([
  rpc('cx_due',{who:a.id,scope}),rpc('cx_board',{who:a.id,scope,screen,skip_rows:Math.max(0,Number(b.offset)||0)}),
  rpc('cx_badges',{who:a.id,scope}),rpc('cx_notification',{who:a.id})]);
- return {due,rows,badges,latest};
+ const taskRows=(rows as Array<{item:Record<string,unknown>;unread:number}>).filter(row=>row.item.kind==='task'&&Number.isSafeInteger(Number(row.item.source_row)));
+ const sourceIds=taskRows.map(row=>Number(row.item.source_row));
+ const fields=sourceIds.length?checked(await client.from('nk_legacy_rows').select('id,data').eq('sheet_name','GIAO VIỆC').in('id',sourceIds))||[]:[];
+ const sources=new Map(fields.map(row=>[Number(row.id),row.data as Record<string,unknown>]));
+ const normalized=(rows as Array<{item:Record<string,unknown>;unread:number}>).map(row=>{const source=sources.get(Number(row.item.source_row));return row.item.kind==='task'&&source&&effectiveTaskCompleted(source)?{...row,item:{...row.item,status:'Hoàn thành'}}:row;});
+ return {due,rows:normalized,badges,latest};
  }
  if(b.action==='upload'){
  must(mime.includes(b.mime)&&Number.isInteger(b.size)&&b.size>0&&b.size<=8388608,'Tệp không đúng định dạng hoặc vượt 8 MB.');
@@ -266,7 +272,7 @@ async function dispatch(req:Request){
   ['Mã công việc',source['ID']||source['Mã công việc']],
   ['Phân loại công việc',source['Loại công việc']||source['Phân loại công việc']],
   ['Từ ngày',source['Ngày bắt đầu']],
-  ['Trạng thái nhân viên',source['Trạng thái NV']||source['Trạng thái nhân viên']],
+  ['Trạng thái nhân viên',effectiveTaskCompleted(source)?'ĐÃ HOÀN THÀNH':source['Trạng thái NV']||source['Trạng thái nhân viên']],
   ['Đánh giá quản lý',source['Đánh giá quản lý']||source['Đánh giá quản lý hiện tại']],
   ['Ghi chú nhân viên',source['Ghi chú NV']||source['Ghi chú nhân viên']],
   ['Người quản lý phê duyệt',source['Người quản lý phê duyệt']],
@@ -283,7 +289,7 @@ async function dispatch(req:Request){
   ['Tài liệu minh chứng đã lưu',source['Tài liệu minh chứng']||source['Tài liệu đính kèm']]
  ]:[];
  const approvalScope=t.kind==='task'?await featureScope(a,'tasks','approve'):'none';
- return {item:t,members,personal,originalFields,approvalStatus:source['Trạng thái phê duyệt']||(t.kind==='task'?'CHƯA XIN Ý KIẾN':'KHÔNG YÊU CẦU'),approvalHistory:source['Lịch sử phê duyệt']||'[]',reviewer:source['Tài khoản duyệt']||'',canReview:approvalScope!=='none'&&(a.admin||(manages&&(source['Tài khoản duyệt']===a.id||(!source['Tài khoản duyệt']&&a.staff_code&&source['Mã người quản lý']===a.staff_code)))),opinion:source['Ý kiến quản lý']||'',department:dept,priority:source['Mức độ ưu tiên']||'',writable,manage:manages,received:(receipts||[]).filter(x=>x.sender===x.request_id).map(x=>x.sender),rows:rows.reverse()};
+ return {item:t.kind==='task'&&effectiveTaskCompleted(source)?{...t,status:'Hoàn thành'}:t,members,personal,originalFields,approvalStatus:source['Trạng thái phê duyệt']||(t.kind==='task'?'CHƯA XIN Ý KIẾN':'KHÔNG YÊU CẦU'),approvalHistory:source['Lịch sử phê duyệt']||'[]',reviewer:source['Tài khoản duyệt']||'',canReview:approvalScope!=='none'&&(a.admin||(manages&&(source['Tài khoản duyệt']===a.id||(!source['Tài khoản duyệt']&&a.staff_code&&source['Mã người quản lý']===a.staff_code)))),opinion:source['Ý kiến quản lý']||'',department:dept,priority:source['Mức độ ưu tiên']||'',writable,manage:manages,received:(receipts||[]).filter(x=>x.sender===x.request_id).map(x=>x.sender),rows:rows.reverse()};
  }
  if(b.action==='edit'){
  const title=str(b.title,180);must(title&&uuid(b.requestId)&&Number.isInteger(b.expected)&&/^\d{4}-\d{2}-\d{2}$/.test(b.due));
