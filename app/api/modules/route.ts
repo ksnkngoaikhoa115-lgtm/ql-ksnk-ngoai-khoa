@@ -6,7 +6,7 @@ import {requireManagerEvaluation} from '../../../lib/task-evaluation';
 import {NextResponse} from 'next/server';
 import {actor,canOperateLegacy} from '../../../lib/auth';
 import {buildLeavePlanning} from '../../../lib/leave-policy';
-import {featureScope,inFeatureScope} from '../../../lib/feature-permissions';
+import {featureScope,inFeatureScope,managedDepartments,managesDepartment} from '../../../lib/feature-permissions';
 import {supabaseAdmin} from '../../../lib/supabase';
 
 export const runtime='nodejs';
@@ -507,7 +507,10 @@ export async function GET(req:Request){const viewer=await actor();if(!viewer)ret
  if(!fullAccess){
   const allowed=['tasks','reminders','violations','plans','checklists','reports','staff','alerts','kpi'];
   if(!allowed.includes(moduleName))return NextResponse.json({ok:false,error:'Phân hệ ngoài phạm vi tài khoản.'},{status:403});
-  const department=text(viewer.team_lead?(viewer.team_department||viewer.department):viewer.department);
+  const f=parseFilters(url);
+  const selectable=viewScope==='team'&&viewer.position_policy==='deputy'?managedDepartments(viewer):[text(viewer.team_lead?(viewer.team_department||viewer.department):viewer.department)];
+  if(selectable.length>1&&f.department&&!selectable.some(d=>same(d,f.department)))return NextResponse.json({ok:false,error:'Bộ phận ngoài phạm vi.'},{status:403});
+  const department=selectable.find(d=>same(d,f.department))||selectable[0]||'';
   if(!department)return NextResponse.json({ok:false,error:'Tài khoản chưa có bộ phận được xác thực.'},{status:403});
   const allStaff=getStaff(await readSheet(S.staff,true));
   const identity=allStaff.find(x=>text(viewer.staff_code)&&same(x.id,viewer.staff_code))||allStaff.find(x=>same(x.name,viewer.name)&&same(x.department,department));
@@ -515,13 +518,12 @@ export async function GET(req:Request){const viewer=await actor();if(!viewer)ret
   const ownName=identity?.name||viewer.name;
   const teamScope=viewScope==='team'||Boolean(viewer.team_lead&&viewer.work_view&&viewScope!=='self'&&viewScope!==null);
   const member=(name:unknown)=>allStaff.some(x=>same(x.name,name)&&same(x.department,department));
-  const f=parseFilters(url);
   if(teamScope&&f.person&&!member(f.person))return NextResponse.json({ok:false,error:'Nhân viên ngoài phạm vi tổ phụ trách.'},{status:403});
   f.department=department;
   if(!teamScope){f.person=['tasks','reminders'].includes(moduleName)?'':ownName;f.manager='';f.assignees=[];}
   const result:AnyRecord=await buildModule(moduleName,f);
   const staff=(result.staff||[]).filter((x:AnyRecord)=>same(x.department,department)&&(teamScope||same(x.name,ownName)));
-  const safe:AnyRecord={...result,staff,departments:[department],scope:teamScope?'department':'self',fixedDepartment:department,
+  const safe:AnyRecord={...result,staff,departments:selectable,scope:teamScope?'department':'self',fixedDepartment:selectable.length>1?'':department,selectedDepartment:department,
     fixedPerson:teamScope?'':ownName,canExport:moduleName==='reports'&&result.canExport===true,
     permissions:{scope:teamScope?'department':'self',canManage:teamScope,canEdit:teamScope,
       canRecordViolation:teamScope,canManageErrorCatalog:teamScope,canManageStaff:teamScope,
@@ -655,11 +657,11 @@ async function getWorkEditRights(user:NonNullable<Awaited<ReturnType<typeof acto
   .split(/[,;|]/).map(value=>value.trim()).filter(Boolean);
  const sender=pick(old,moduleName==='tasks'?['Người giao việc','Người giao','Người tạo']:['NGƯỜI NHẮC','Người nhắc']);
  const dept=text(pick(old,['Bộ phận','Thuộc bộ phận']));
- const teamDept=text(user.team_department||user.department);
+ const teamDept=managedDepartments(user);
  const manager=granted==='hospital';
- const delegatedTeam=granted==='team'&&Boolean(teamDept&&dept&&same(teamDept,dept));
- const allInTeam=names.length>0&&names.every(name=>staff.some(person=>same(person.name,name)&&same(person.department,teamDept)));
- const teamLead=delegatedTeam&&allInTeam||Boolean(user.team_lead&&user.work_view&&user.work_edit&&granted==='team'&&teamDept&&allInTeam&&(!dept||same(dept,teamDept)));
+ const delegatedTeam=granted==='team'&&Boolean(dept&&managesDepartment(user,dept));
+ const allInTeam=names.length>0&&names.every(name=>staff.some(person=>same(person.name,name)&&managesDepartment(user,person.department)));
+ const teamLead=delegatedTeam&&allInTeam||Boolean(user.team_lead&&user.work_view&&user.work_edit&&granted==='team'&&teamDept.length>0&&allInTeam&&(!dept||managesDepartment(user,dept)));
  const threadQuery=await db().from('cx_threads').select('owner_id,performers,units')
   .eq('source_row',row.id).eq('kind',moduleName==='tasks'?'task':'reminder').limit(1).maybeSingle();
  if(threadQuery.error)throw threadQuery.error;
@@ -797,7 +799,8 @@ export async function POST(req:Request){const user=await actor();if(!user)return
   const data=body.data&&typeof body.data==='object'&&!Array.isArray(body.data)?body.data:body;
   const oldDepartment=text(existing?.data?.['Bộ phận']||existing?.data?.['Thuộc bộ phận']);
   const newDepartment=text(data.department||data['Bộ phận']||data['Thuộc bộ phận']);
-  if(oldDepartment&&!same(oldDepartment,department)||newDepartment&&!same(newDepartment,department))
+  const matchesManaged=(d:string)=>actionScope==='team'?managesDepartment(user,d):same(d,department);
+  if(oldDepartment&&!matchesManaged(oldDepartment)||newDepartment&&!matchesManaged(newDepartment))
    return NextResponse.json({ok:false,error:'Hồ sơ ngoài phạm vi bộ phận.'},{status:403});
   if(!existing&&!newDepartment)return NextResponse.json({ok:false,error:'Phải chọn bộ phận để tạo hồ sơ.'},{status:400});
   if(!team){
@@ -816,9 +819,10 @@ export async function POST(req:Request){const user=await actor();if(!user)return
   if(moduleName==='checklists'&&op==='save'){
    const forms=(await readSheet(S.checklistForms,true)).map(formMaster);
    const code=text(data.formCode),old=existing&&checklist(existing);
-   if(old&&!same(old.formCode,code)||!old&&!forms.some(f=>same(f.code,code)&&(!f.department||same(f.department,department))))
+   const targetDepartment=oldDepartment||newDepartment||department;
+   if(old&&!same(old.formCode,code)||!old&&!forms.some(f=>same(f.code,code)&&(!f.department||same(f.department,targetDepartment))))
     return NextResponse.json({ok:false,error:'Mẫu phiếu ngoài phạm vi.'},{status:403});
-   return NextResponse.json({ok:true,...await saveChecklistParity({...data,department,supervisor:user.name})});
+   return NextResponse.json({ok:true,...await saveChecklistParity({...data,department:targetDepartment,supervisor:user.name})});
   }
   if(moduleName==='checklistForm'&&op==='delete'){
    const formCode=text(existing?.data?.['Mã phiếu']);
@@ -860,7 +864,7 @@ export async function POST(req:Request){const user=await actor();if(!user)return
  if(moduleName==='checklists'&&(op==='save'||!op))return NextResponse.json({ok:true,...await saveChecklistParity(body.data||body)});
  if(moduleName==='plans'&&['complete','reset','plan_status'].includes(op)){const sheet=sheetFor('plans',body);const row=await readRow(sheet,Number(body.row_no));if(!row)throw new Error('Không tìm thấy kế hoạch.');const data={...row.data};const status=op==='complete'?'HOÀN THÀNH':op==='reset'?'CHƯA BẮT ĐẦU':body.status||'CHƯA BẮT ĐẦU';data['Trạng thái']=status;data['Kết quả']=body.result??data['Kết quả']??'';data['Ngày hoàn thành']=status==='HOÀN THÀNH'?today():'';await saveRow(sheet,row.row_no,data);return NextResponse.json({ok:true,row_no:row.row_no});}
  if(moduleName==='plans'&&op==='carry'){const sheet=sheetFor('plans',body);const row=await readRow(sheet,Number(body.row_no));if(!row)throw new Error('Không tìm thấy kế hoạch cần chuyển tiếp.');const old=plan(row,text(body.type).toUpperCase()||'TUẦN');const next=carryDates(old.fromDate,old.toDate,old.type);await saveRow(sheet,row.row_no,{...row.data,'Trạng thái':'CHUYỂN TIẾP','Kỳ chuyển tiếp':old.type==='THÁNG'?'THÁNG SAU':'TUẦN SAU'});const newId=old.type==='THÁNG'?`KHM${Date.now()}`:`KHT${Date.now()}`;const newRow=await saveRow(sheet,undefined,{...row.data,'Mã KH':newId,'Từ ngày':next.from,'Đến ngày':next.to,'Trạng thái':'CHƯA BẮT ĐẦU','Kết quả':'','Ngày hoàn thành':'','Mã kế hoạch gốc':old.rootId||old.id,'Kỳ chuyển tiếp':old.type==='THÁNG'?'THÁNG SAU':'TUẦN SAU'});return NextResponse.json({ok:true,row_no:newRow,id:newId});}
- if(moduleName==='kpi'&&op==='save_report'){const scope=await featureScope(user,'kpi','edit');const dept=text(body.department||user.team_department||user.department);if(!inFeatureScope(user,scope,dept,user.staff_code,body.person||user.name))return NextResponse.json({ok:false,error:'Không được lưu KPI ngoài phạm vi.'},{status:403});if(scope!=='hospital'&&(!same(dept,user.team_department||user.department)||scope==='self'&&body.person&&!same(body.person,user.name)))return NextResponse.json({ok:false,error:'Không được xuất kỳ KPI ngoài phạm vi.'},{status:403});const allStaff=getStaff(await readSheet(S.staff));const result=await buildKpi({from:text(body.fromDate),to:text(body.toDate),department:dept,person:scope==='self'?user.name:text(body.person)},allStaff,[],staffMap(allStaff));const rows=result.rows as AnyRecord[];if(!rows.length)throw new Error('Không có dữ liệu KPI phù hợp để lưu.');const snapshotId=`KPI-${Date.now()}`;const savedAt=new Date().toISOString();for(const x of rows)await saveRow(S.kpi,undefined,canonical('kpi',{...x,fromDate:body.fromDate,toDate:body.toDate,snapshotId,savedAt}));return NextResponse.json({ok:true,savedCount:rows.length,snapshotId,savedAt});}
+ if(moduleName==='kpi'&&op==='save_report'){const scope=await featureScope(user,'kpi','edit');const dept=text(body.department||user.team_department||user.department);if(!inFeatureScope(user,scope,dept,user.staff_code,body.person||user.name))return NextResponse.json({ok:false,error:'Không được lưu KPI ngoài phạm vi.'},{status:403});if(scope!=='hospital'&&(!managesDepartment(user,dept)||scope==='self'&&body.person&&!same(body.person,user.name)))return NextResponse.json({ok:false,error:'Không được xuất kỳ KPI ngoài phạm vi.'},{status:403});const allStaff=getStaff(await readSheet(S.staff));const result=await buildKpi({from:text(body.fromDate),to:text(body.toDate),department:dept,person:scope==='self'?user.name:text(body.person)},allStaff,[],staffMap(allStaff));const rows=result.rows as AnyRecord[];if(!rows.length)throw new Error('Không có dữ liệu KPI phù hợp để lưu.');const snapshotId=`KPI-${Date.now()}`;const savedAt=new Date().toISOString();for(const x of rows)await saveRow(S.kpi,undefined,canonical('kpi',{...x,fromDate:body.fromDate,toDate:body.toDate,snapshotId,savedAt}));return NextResponse.json({ok:true,savedCount:rows.length,snapshotId,savedAt});}
  if(moduleName==='feedback'&&(op==='save_feedback'||op==='save')){const scope=await featureScope(user,'kpi','edit');if(!inFeatureScope(user,scope,body.department,undefined,body.person))return NextResponse.json({ok:false,error:'Phản hồi KPI ngoài phạm vi cấp quyền.'},{status:403});const rows=await readSheet(S.kpiFeedback);const found=rows.find(r=>same(pick(r.data,['Từ ngày']),body.from)&&same(pick(r.data,['Đến ngày']),body.to)&&same(pick(r.data,['Bộ phận']),body.department)&&same(pick(r.data,['Nhân viên']),body.person));const rowNo=await saveRow(S.kpiFeedback,found?.row_no,canonical('feedback',body));return NextResponse.json({ok:true,row_no:rowNo});}
  if(moduleName==='rule'&&op==='save_rules'){if(!user.admin)return NextResponse.json({ok:false,error:'Chỉ quản trị viên được thay đổi quy tắc KPI toàn khoa.'},{status:403});const rows=Array.isArray(body.rows)?body.rows as AnyRecord[]:[];if(!rows.length)throw new Error('Phải có ít nhất một mức xếp loại KPI.');if(rows.some(row=>!text(row.min).trim()||!text(row.max).trim()||!text(row.ranking).trim()))throw new Error('Vui lòng nhập tên xếp loại, Từ điểm và Đến điểm.');const normalized:AnyRecord[]=rows.map((row,index)=>({...row,order:Number(row.order)||index+1,min:Number(row.min),max:Number(row.max)}));if(normalized.some(row=>!text(row.ranking)||!Number.isFinite(row.min)||!Number.isFinite(row.max)||row.max<row.min))throw new Error('Mỗi mức KPI phải có tên và khoảng điểm hợp lệ.');const sorted:AnyRecord[]=normalized.slice().sort((a,b)=>a.min-b.min);for(let index=1;index<sorted.length;index++){if(sorted[index].min<=sorted[index-1].max)throw new Error(`Khoảng điểm KPI bị chồng lấn giữa “${sorted[index-1].ranking}” và “${sorted[index].ranking}”.`);}const existing=await readSheet(S.kpiRules);const keep=new Set(normalized.map(row=>Number(row.row_no)).filter(row=>Number.isFinite(row)&&row>0));for(const old of existing){if(!keep.has(old.row_no)){const {error}=await db().from('nk_legacy_rows').delete().eq('sheet_name',S.kpiRules).eq('row_no',old.row_no);if(error)throw error;}}for(const x of normalized)await saveRow(S.kpiRules,Number(x.row_no)||undefined,canonical('rule',x));return NextResponse.json({ok:true,savedCount:normalized.length});}
  const sheet=sheetFor(moduleName,body);if(!sheet)throw new Error('Thiếu sheet phân hệ.');const data=canonical(moduleName,body);
@@ -875,10 +879,9 @@ export async function POST(req:Request){const user=await actor();if(!user)return
    if(!workRights.manager&&!workRights.owner&&!same(data['Bộ phận'],pick(old,['Bộ phận','Thuộc bộ phận'])))
     return NextResponse.json({ok:false,error:'Không được chuyển công việc sang bộ phận ngoài quyền.'},{status:403});
    if(workRights.teamLead&&!workRights.manager&&!workRights.owner&&!same(data['Người thực hiện'],pick(old,['Người thực hiện','Người chịu trách nhiệm']))){
-    const teamDept=text(user.team_department||user.department);
     const staffs=getStaff(await readSheet(S.staff,true));
     const people=text(data['Người thực hiện']).split(/[,;|]/).map(x=>x.trim()).filter(Boolean);
-    if(!people.length||!people.every(name=>staffs.some(person=>same(person.name,name)&&same(person.department,teamDept))))
+    if(!people.length||!people.every(name=>staffs.some(person=>same(person.name,name)&&managesDepartment(user,person.department))))
      return NextResponse.json({ok:false,error:'Tổ trưởng chỉ được điều chỉnh người thực hiện thuộc bộ phận mình.'},{status:403});
    }
    for(const field of ['ID','Người giao việc','Trạng thái phê duyệt','Kết quả phê duyệt','Nội dung xin phê duyệt','Nội dung xin ý kiến quản lý','Thời gian xin ý kiến','Thời gian xin phê duyệt','Ngày xin ý kiến','Phản hồi quản lý','Thời gian phê duyệt','Ngày phê duyệt','Lịch sử phê duyệt']){
@@ -896,10 +899,9 @@ export async function POST(req:Request){const user=await actor();if(!user)return
    if(!workRights.manager&&!workRights.teamLead&&!workRights.owner&&!same(data['NGƯỜI LIÊN QUAN'],pick(old,['NGƯỜI LIÊN QUAN','Người liên quan'])))
     return NextResponse.json({ok:false,error:'Không được tự chuyển nhắc việc cho người khác.'},{status:403});
    if(workRights.teamLead&&!workRights.manager&&!workRights.owner&&!same(data['NGƯỜI LIÊN QUAN'],pick(old,['NGƯỜI LIÊN QUAN','Người liên quan']))){
-    const teamDept=text(user.team_department||user.department);
     const staffs=getStaff(await readSheet(S.staff,true));
     const people=text(data['NGƯỜI LIÊN QUAN']).split(/[,;|]/).map(x=>x.trim()).filter(Boolean);
-    if(!people.length||!people.every(name=>staffs.some(person=>same(person.name,name)&&same(person.department,teamDept))))
+    if(!people.length||!people.every(name=>staffs.some(person=>same(person.name,name)&&managesDepartment(user,person.department))))
      return NextResponse.json({ok:false,error:'Tổ trưởng chỉ được nhắc nhân viên trong bộ phận mình.'},{status:403});
    }
   }

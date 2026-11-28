@@ -4,7 +4,7 @@ import {useEffect,useMemo,useState} from 'react'
 type Scope='none'|'self'|'team'|'hospital'
 type Action='view'|'create'|'edit'|'delete'|'approve'|'history'|'export'
 type Grants=Record<string,Partial<Record<Action,Scope>>>
-type Person={id:string;name:string;username:string;department:string;staff_code:string|null;team_department:string|null;team_lead:boolean;work_role_reviewed:boolean;legacy_operator:boolean;work_view:boolean;work_edit:boolean;can_approve_work?:boolean;version:string|null;overrides:Grants;effective:Grants;defaults:Grants}
+type Person={id:string;name:string;username:string;department:string;staff_code:string|null;team_department:string|null;managed_departments?:string[]|null;team_lead:boolean;work_role_reviewed:boolean;legacy_operator:boolean;work_view:boolean;work_edit:boolean;can_approve_work?:boolean;version:string|null;overrides:Grants;effective:Grants;defaults:Grants}
 type Payload={people:Person[];features:Record<string,Action[]>;featureLabels:Record<string,string>;actionLabels:Record<Action,string>;history:Array<{changed_at:string;changed_by:string}>}
 const captions:Record<Scope,string>={none:'— Không',self:'Cá nhân',team:'Toàn tổ',hospital:'Toàn khoa'}
 const rank:Record<Scope,number>={none:0,self:1,team:2,hospital:3}
@@ -119,7 +119,7 @@ export default function PermissionMatrix(){
     </div>
    </div>
    {delegatedSummary.length>0&&<div className="pmatrix-impact"><b>Quyền mở rộng so với mặc định ({delegatedSummary.length}):</b> {delegatedSummary.map(item=>[data?.featureLabels[item.feature],data?.actionLabels[item.action],captions[item.scope]].join(' · ')).join(' | ')}</div>}
-   <div className="pmatrix-profile"><span><b>{selected.name}</b> · {selected.department} {selected.team_lead&&'· Tổ '+(selected.team_department||selected.department)}</span><span>Ủy quyền linh động tối đa: <b>Toàn khoa</b> (riêng từng chức năng)</span></div>
+   <div className="pmatrix-profile"><span><b>{selected.name}</b> · {selected.department} {selected.team_lead&&'· Tổ '+(selected.managed_departments?.length?selected.managed_departments.join(' · '):selected.team_department||selected.department)}</span><span>Ủy quyền linh động tối đa: <b>Toàn khoa</b> (riêng từng chức năng)</span></div>
    <p className="pmatrix-legend">Mỗi ô chọn <b>Không cho phép</b> hoặc <b>Cho phép trong phạm vi</b>. Các ô xám là chức năng chưa có nghiệp vụ tương ứng. Kể cả Nhân viên cũng có thể được quản trị viên ủy quyền Toàn tổ hoặc Toàn khoa theo từng quyền. Xem là quyền nền tảng của các quyền thao tác khác.</p>
    {groups.map(group=><details key={group.name} className="pmatrix-group" open>
     <summary>{group.name}<span>{group.features.length} phân hệ</span></summary>

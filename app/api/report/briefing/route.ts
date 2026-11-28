@@ -1,5 +1,5 @@
 import {actor,db} from '../../../../lib/auth'
-import {featureScope,inFeatureScope} from '../../../../lib/feature-permissions'
+import {featureScope,inFeatureScope,managedDepartments} from '../../../../lib/feature-permissions'
 import {GET as reports} from '../../modules/route'
 import {aggregate,colors,defaults,levels,severity} from '../../../../lib/matrix'
 import {sectionTitles,type Section,type SectionKey} from '../../../../lib/briefing-sections'
@@ -54,9 +54,10 @@ export async function POST(req:Request){
   const department=user.team_department||user.department
   if(!department||!inFeatureScope(user,exportScope,department,user.staff_code,user.name))
    return Response.json({error:'Không có phạm vi xuất báo cáo hợp lệ.'},{status:403})
-  if(departments.some((d:string)=>d.toLocaleLowerCase('vi')!==department.toLocaleLowerCase('vi')))
+  const permitted=exportScope==='team'?managedDepartments(user):[department];
+  if(departments.some((d:string)=>!permitted.some(p=>p.toLocaleLowerCase('vi')===d.toLocaleLowerCase('vi'))))
    return Response.json({error:'Bộ phận ngoài phạm vi.'},{status:403})
-  departments.splice(0,departments.length,department)
+  if(!departments.length)departments.splice(0,departments.length,...permitted)
   if(exportScope==='self'){
    if(filters?.person&&filters.person!==user.name)return Response.json({error:'Nhân viên ngoài phạm vi xuất.'},{status:403})
    filters.person=user.name

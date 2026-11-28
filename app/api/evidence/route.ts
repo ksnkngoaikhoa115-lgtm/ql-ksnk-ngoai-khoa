@@ -2,7 +2,7 @@ import {NextResponse} from 'next/server';
 import {supabaseAdmin,effectiveSupabaseUrl} from '../../../lib/supabase';
 import {evidenceStoragePath} from '../../../lib/evidence-url';
 import {actor,type Person} from '../../../lib/auth';
-import {featureScope,inFeatureScope} from '../../../lib/feature-permissions';
+import {featureScope,inFeatureScope,managedDepartments,managesDepartment} from '../../../lib/feature-permissions';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -58,9 +58,9 @@ async function workEvidenceAllowed(user:Person,module:'tasks'|'reminders',refere
  if(thread&&!thread.units.includes('surgery'))return false;
  // A report-scoped delegation is based on the original source's team,
  // never on an arbitrary evidence filename or a client-supplied team filter.
- const teamDept=String(user.team_department||user.department||'').trim();
+ const teamDept=managedDepartments(user);
  if(scope==='hospital')return true;
- if(scope==='team'&&teamDept&&department&&sameName(department,teamDept))return true;
+ if(scope==='team'&&teamDept.length&&department&&managesDepartment(user,department))return true;
  if(thread){
   if(!Array.isArray(thread.units)||!thread.units.includes('surgery'))return false;
   if(thread.owner_id===user.id||Array.isArray(thread.performers)&&thread.performers.includes(user.id))return true;
@@ -78,8 +78,8 @@ async function workEvidenceAllowed(user:Person,module:'tasks'|'reminders',refere
   if(sameName(sender,identity)||names.some(name=>sameName(name,identity)))return true;
  }
  const teamStaff=names.length>0&&names.every(name=>directory.some(person=>
-  sameName(person['Họ và tên']??person['Họ tên'],name)&&sameName(person['Bộ phận'],teamDept)));
- return Boolean(scope==='team'&&teamDept&&!department&&teamStaff);
+  sameName(person['Họ và tên']??person['Họ tên'],name)&&managesDepartment(user,person['Bộ phận'])));
+ return Boolean(scope==='team'&&teamDept.length&&!department&&teamStaff);
 }
 /**
  * Read the original plan/violation/issue row before resolving its evidence.
