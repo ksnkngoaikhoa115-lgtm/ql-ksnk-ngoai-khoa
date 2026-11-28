@@ -18,10 +18,14 @@ export type Feature=keyof typeof FEATURE_ACTIONS
 export type Action='view'|'create'|'edit'|'delete'|'approve'|'history'|'export'
 export type Scope='none'|'self'|'team'|'hospital'
 export type GrantMatrix=Partial<Record<Feature,Partial<Record<Action,Scope>>>>
-export type Role='staff'|'team'|'chief'
-export const ROLES:readonly Role[]=['staff','team','chief']
-export const roleNames:Record<Role,string>={staff:'Nhân viên',team:'Tổ trưởng',chief:'Trưởng khoa / Điều dưỡng trưởng'}
+export type Role='staff'|'team'|'chief'|'deputy'|'head_nurse'
+export const ROLES:readonly Role[]=['chief','deputy','head_nurse','team','staff']
+export const roleNames:Record<Role,string>={staff:'Nhân viên',team:'Tổ trưởng',chief:'Trưởng khoa',deputy:'Phó khoa',head_nurse:'Điều dưỡng trưởng'}
 export function roleOf(person:Person):Role{
+ if(person.work_view&&person.work_role_reviewed){
+  if(person.position_policy==='deputy'&&person.team_lead)return 'deputy'
+  if(person.position_policy==='head_nurse'&&person.legacy_operator)return 'head_nurse'
+ }
  return person.legacy_operator&&person.work_view?'chief':person.team_lead&&person.work_role_reviewed&&person.work_view?'team':'staff'
 }
 
@@ -69,7 +73,7 @@ export function defaultFeatureScope(person:Person,feature:Feature,action:Action)
 /** One shared source of truth for role defaults, used by both API checks and UI previews. */
 export function baselineForRole(role:Role):GrantMatrix{
  const model={
-  admin:false,legacy_operator:role==='chief',team_lead:role==='team',work_role_reviewed:true,
+  admin:false,legacy_operator:['chief','head_nurse'].includes(role),team_lead:['deputy','team'].includes(role),work_role_reviewed:true,
   work_view:true,work_edit:role!=='staff',can_approve_work:false
  } as Person
  const out:GrantMatrix={}
