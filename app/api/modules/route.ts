@@ -105,7 +105,7 @@ function ymd(value:unknown){
 function today(){const d=new Date();return d.toISOString().slice(0,10);}
 function reportTaskOverdue(task:AnyRecord){
  const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}).format(new Date());
- return !done(task.status)&&(norm(task.status).includes('qua han')||Boolean(task.endDate&&task.endDate<day));
+ return norm(task.approvalStatus)!=='da phe duyet'&&!done(task.status)&&(norm(task.status).includes('qua han')||Boolean(task.endDate&&task.endDate<day));
 }
 function done(value:unknown){const valueNorm=norm(value);return DONE.some(word=>valueNorm.includes(word));}
 function dayDelta(value:unknown){const raw=ymd(value);if(!raw)return null;const target=new Date(`${raw}T00:00:00`);const current=new Date(`${today()}T00:00:00`);return Math.round((target.getTime()-current.getTime())/86400000);}
@@ -180,8 +180,10 @@ function task(row:LegacyRow,map?:Map<string,string>,staffDirectory:AnyRecord[]=[
  const managerRecord=staffDirectory.find(x=>(rawManagerId&&same(x.id,rawManagerId))||(rawManager&&same(x.name,rawManager)));
  const managerName=managerRecord?.name||rawManager;
  const managerId=managerRecord?.id||rawManagerId;
- const savedStatus=pick(d,['Trạng thái NV','Trạng thái'])||'CHƯA BẮT ĐẦU';
- const savedEvalStatus=pick(d,['Đánh giá quản lý','Đánh giá quản lý hiện tại','Đánh giá'])||'CHƯA BẮT ĐẦU';
+ const approved=norm(pick(d,['Trạng thái phê duyệt','Trạng thái xin ý kiến']))==='da phe duyet';
+ const savedStatus=approved?'ĐÃ HOÀN THÀNH':pick(d,['Trạng thái NV','Trạng thái'])||'CHƯA BẮT ĐẦU';
+ const historicalEvaluation=pick(d,['Đánh giá quản lý','Đánh giá quản lý hiện tại','Đánh giá'])||'CHƯA BẮT ĐẦU';
+ const savedEvalStatus=done(savedStatus)&&norm(historicalEvaluation)==='qua han'?'HOÀN THÀNH SAU HẠN':historicalEvaluation;
  const startDate=ymd(d['Ngày bắt đầu']);
  const endDate=ymd(d['Ngày kết thúc']);
  const overdue=Boolean(endDate&&endDate<today()&&!done(savedStatus));
@@ -211,7 +213,7 @@ function reminderFilter(rows:AnyRecord[],f:Filters){const title=norm(f.title);re
 function workload(rows:AnyRecord[],staff:AnyRecord[]){const names=[...new Set([...staff.map(x=>x.name),...rows.flatMap(x=>text(x.assignee).split(/[,;|]/).map(v=>v.trim())).filter(Boolean)])].filter(Boolean);return names.map(name=>{const mine=rows.filter(x=>hasAssignee(x.assignee,name));return {name,activeCount:mine.filter(x=>!done(x.status)&&!norm(x.status).includes('qua han')).length,completed:mine.filter(x=>done(x.status)).length,overdue:mine.filter(x=>norm(x.status).includes('qua han')).length,waitingManager:mine.filter(x=>isWaitingManager(x.approvalStatus)).length,waitingEmployee:mine.filter(x=>['da phe duyet','yeu cau bo sung','tu choi'].includes(norm(x.approvalStatus))&&!x.employeeFeedback).length,totalTasks:mine.length};});}
 function rulesFrom(rows:AnyRecord[]){const rules=rows.map(row=>{const d=row.data||row;return {row_no:row.row_no,order:num(d['STT']??row.order),ranking:pick(d,['Xếp loại'])||text(row.ranking),min:num(d['Từ điểm']??row.min),max:num(d['Đến điểm']??row.max),color:pick(d,['Màu'])||row.color||'#6C757D',status:pick(d,['Trạng thái'])||'Hoạt động'};}).filter(x=>x.ranking&&norm(x.status)!=='tam ngung'&&norm(x.status)!=='ngung').sort((a,b)=>a.order-b.order);return rules.length?rules:DEFAULT_RULES;}
 function rankFor(total:number,rules:AnyRecord[]){return rules.find(x=>total>=x.min&&total<=x.max)||rules[rules.length-1]||DEFAULT_RULES[DEFAULT_RULES.length-1];}
-function taskScoreOf(value:unknown){const key=norm(value);if(key==='xuat sac')return 10;if(key==='tot')return 5;if(key==='kha')return 0;if(key==='chua dat'||key==='chua dat lam lai'||key==='lam lai')return -5;if(key==='kem')return -10;if(key==='qua han')return -5;return Number(TASK_SCORE[text(value).toUpperCase()]??0);}
+function taskScoreOf(value:unknown){const key=norm(value);if(key==='xuat sac')return 10;if(key==='tot')return 5;if(key==='kha')return 0;if(key==='chua dat'||key==='chua dat lam lai'||key==='lam lai')return -5;if(key==='kem')return -10;if(key==='qua han'||key==='hoan thanh sau han')return -5;return Number(TASK_SCORE[text(value).toUpperCase()]??0);}
 function computeKpi(staff:AnyRecord[],tasks:AnyRecord[],checks:AnyRecord[],violations:AnyRecord[],rules:AnyRecord[]){return staff.map(s=>{const st=tasks.filter(x=>hasAssignee(x.assignee,s.name));const sc=checks.filter(x=>same(x.person,s.name));const sv=violations.filter(x=>same(x.person,s.name));let taskScore=0;const details:string[]=[];for(const x of st){const key=text(x.evalStatus).toUpperCase();const value=taskScoreOf(x.evalStatus);taskScore+=value;if(value)details.push(`${value>0?'+':''}${value} Giao việc: ${x.title} (${key})`);}const checklistScore=sc.reduce((n,x)=>n+num(x.percentKpi??x.kpi),0);for(const x of sc){const value=num(x.percentKpi??x.kpi);if(value)details.push(`${value>0?'+':''}${value} Bảng kiểm ${x.date}: ${x.percentRate??x.rate??0}%`);}const violationScore=-sv.reduce((n,x)=>n+Math.abs(num(x.points)),0);for(const x of sv){if(num(x.points))details.push(`-${Math.abs(num(x.points))} Vi phạm ${x.date}: ${x.errorName}`);}const total=100+taskScore+checklistScore+violationScore;const rank=rankFor(total,rules);return {staffId:s.id,name:s.name,person:s.name,department:s.department,position:s.position,base:100,taskScore,checklistScore,violationScore,total,ranking:rank.ranking,rank:rank.ranking,rankingColor:rank.color,details,taskCount:st.length,checkCount:sc.length,violationCount:sv.length};});}
 
 function numberOr(value:unknown,fallback:number){return text(value)===''?fallback:num(value);}

@@ -19,7 +19,8 @@ function dateDay(value: string) {
 }
 export function taskColumn(task: BoardTask, today = vietnamDay()): BoardColumn {
   const status=(task.status||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d');
-  if(['hoan thanh','dong','da khac phuc','hoan tat','da xong'].some(word=>status.includes(word)))return 'done';
+  const approval=(task.approvalStatus||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').trim();
+  if(approval==='da phe duyet'||['hoan thanh','dong','da khac phuc','hoan tat','da xong'].some(word=>status.includes(word)))return 'done';
   const end=dateDay(task.endDate||'');const current=dateDay(today);
   if(!Number.isFinite(end))return 'noDate';
   if(end<current)return 'overdue';
