@@ -108,6 +108,7 @@ export default function PermissionMatrix(){
   {selected&&!selected.active&&<p>{selected.name} · {selected.pending_login?'Chờ kích hoạt':'Tài khoản đang khóa'}. <a target="_top" href={'/ngoai-khoa?work=admin&employee='+encodeURIComponent(selected.id)}>Mở tài khoản nhân sự</a></p>}
   {selected?.active&&<>
    <p>Chức vụ nhân sự: <b>{selected.hrPosition}</b> · Chính sách quyền đang áp dụng: <b>{selected.policyName}</b> · Tài khoản CONNECT: <b>{selected.username}</b></p>
+   {tidy(selected.hrPosition)!==tidy(selected.policyName)&&<p role="alert" className="pmatrix-unsaved">Chức vụ và quyền nghiệp vụ chưa khớp. <a target="_top" href={'/ngoai-khoa?work=admin&employee='+encodeURIComponent(selected.id)}>Kiểm tra tài khoản và xác nhận chức vụ</a>. Hệ thống không tự nâng quyền.</p>}
    <div className="pmatrix-toolbar">
     <div><b>Ủy quyền nhanh: Chỉ xem Toàn khoa</b><p>Áp dụng riêng cho phân hệ chọn dưới đây; giữ nguyên quyền Thêm, Sửa, Xóa, Phê duyệt và Xuất báo cáo.</p></div>
     <div className="pmatrix-quick">
