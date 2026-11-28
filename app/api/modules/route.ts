@@ -520,11 +520,17 @@ export async function GET(req:Request){const viewer=await actor();if(!viewer)ret
   const ownName=identity?.name||viewer.name;
   const teamScope=viewScope==='team'||Boolean(viewer.team_lead&&viewer.work_view&&viewScope!=='self'&&viewScope!==null);
   const member=(name:unknown)=>allStaff.some(x=>same(x.name,name)&&same(x.department,department));
-  if(teamScope&&f.person&&!member(f.person))return NextResponse.json({ok:false,error:'Nhân viên ngoài phạm vi tổ phụ trách.'},{status:403});
+  const workMember=(name:unknown)=>allStaff.some(x=>same(x.name,name)&&managesDepartment(viewer,x.department));
+  if(teamScope&&f.person&&!(['tasks','reminders'].includes(moduleName)?workMember(f.person):member(f.person)))return NextResponse.json({ok:false,error:'Nhân viên ngoài phạm vi tổ phụ trách.'},{status:403});
   f.department=department;
   if(!teamScope){f.person=['tasks','reminders'].includes(moduleName)?'':ownName;f.manager='';f.assignees=[];}
   const result:AnyRecord=await buildModule(moduleName,f);
-  const staff=(result.staff||[]).filter((x:AnyRecord)=>same(x.department,department)&&(teamScope||same(x.name,ownName)));
+  // Assignment roster is independent of the list's currently selected department.
+  const workModule=moduleName==='tasks'||moduleName==='reminders';
+  const creationScope=workModule?await featureScope(viewer,moduleName as 'tasks'|'reminders','create'):'none';
+  const staff=workModule&&(creationScope==='team'||creationScope==='hospital')
+   ?allStaff.filter(x=>staffEmploymentStatus(x.status)==='Đang làm việc'&&(creationScope==='hospital'||managesDepartment(viewer,x.department)))
+   :(result.staff||[]).filter((x:AnyRecord)=>same(x.department,department)&&(teamScope||same(x.name,ownName)));
   const safe:AnyRecord={...result,staff,departments:selectable,scope:teamScope?'department':'self',fixedDepartment:selectable.length>1?'':department,selectedDepartment:department,
     fixedPerson:teamScope?'':ownName,canExport:moduleName==='reports'&&result.canExport===true,
     permissions:{scope:teamScope?'department':'self',canManage:teamScope,canEdit:teamScope,
@@ -545,7 +551,7 @@ export async function GET(req:Request){const viewer=await actor();if(!viewer)ret
   }
   if(moduleName==='reminders'){
     safe.rows=(result.rows||[]).filter((x:AnyRecord)=>teamScope
-      ?text(x.person).split(/[,;|]/).map(name=>name.trim()).filter(Boolean).every(name=>member(name))&&Boolean(text(x.person))
+      ?text(x.person).split(/[,;|]/).map(name=>name.trim()).filter(Boolean).every(name=>workMember(name))&&Boolean(text(x.person))
       :hasAssignee(x.person,ownName)||same(x.assigner,ownName));
     safe.total=safe.rows.length;
   }
