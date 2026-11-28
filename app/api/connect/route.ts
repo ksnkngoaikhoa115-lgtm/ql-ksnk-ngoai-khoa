@@ -43,7 +43,7 @@ async function dispatch(req:Request){
  must(['reminder','task'].includes(b.kind)&&Number.isSafeInteger(b.row)&&b.row>0);
  const source=checked(await client.from('nk_legacy_rows').select('id,legacy_id,data').eq('sheet_name',b.kind==='task'?'GIAO VIỆC':'NHAC_VIEC_GHI_CHU').eq('row_no',b.row).maybeSingle());
  must(source&&(!b.ref||[source.legacy_id,source.data?.ID,source.data?.['MÃ NHẮC VIỆC']].includes(b.ref)),'Hồ sơ đã thay đổi. Tải lại danh sách.',404);
- const item=checked(await client.from('cx_threads').select('*').eq('source_row',source.id).maybeSingle());
+ const item=checked(await client.from('cx_threads').select('*').eq('source_row',source.id).eq('kind',b.kind).maybeSingle());
  must(item&&await rpc('nk_check_work',{who:a.id,work_id:item.id}),'Chỉ người tham gia việc này được mở trò chuyện.',403);
  return {id:item.id};
  }
@@ -81,7 +81,7 @@ async function dispatch(req:Request){
  const hrById=new Map(hrRecords.map((record:{id:number;data:Record<string,unknown>})=>[record.id,record.data]));
  return {staff:staff.map(employee=>{
   const hr=hrById.get(Number(employee.source_id))||{};
-  return {...employee,position:staffPosition(hr['Chức vụ'])||String(hr['Chức vụ']||''),employmentStatus:staffEmploymentStatus(hr['Trạng thái'])||String(hr['Trạng thái']||'')};
+  return {...employee,position:staffPosition(hr['Chức vụ']||hr['Chức danh'])||String(hr['Chức vụ']||hr['Chức danh']||''),employmentStatus:staffEmploymentStatus(hr['Trạng thái'])||String(hr['Trạng thái']||'')};
  }),pending};
  }
  if(b.action==='account'){
@@ -289,8 +289,8 @@ async function dispatch(req:Request){
   ['Ảnh minh chứng đã lưu',source['Ảnh minh chứng']||source['Hình ảnh']],
   ['Tài liệu minh chứng đã lưu',source['Tài liệu minh chứng']||source['Tài liệu đính kèm']]
  ]:[];
- const approvalScope=t.kind==='task'?await featureScope(a,'tasks','approve'):'none';
- return {item:t.kind==='task'&&effectiveTaskCompleted(source)?{...t,status:'Hoàn thành'}:t,members,personal,originalFields,approvalStatus:source['Trạng thái phê duyệt']||(t.kind==='task'?'CHƯA XIN Ý KIẾN':'KHÔNG YÊU CẦU'),approvalHistory:source['Lịch sử phê duyệt']||'[]',reviewer:source['Tài khoản duyệt']||'',canReview:approvalScope!=='none'&&(a.admin||(manages&&(source['Tài khoản duyệt']===a.id||(!source['Tài khoản duyệt']&&a.staff_code&&source['Mã người quản lý']===a.staff_code)))),opinion:source['Ý kiến quản lý']||'',department:dept,priority:source['Mức độ ưu tiên']||'',writable,manage:manages,received:(receipts||[]).filter(x=>x.sender===x.request_id).map(x=>x.sender),rows:rows.reverse()};
+ const approval=t.kind==='chat'?null:await rpc('nk_approval_context',{who:a.id,work_id:t.id}) as {status?:string;history?:unknown[];reviewer?:string;canReview?:boolean}|null;
+ return {item:t.kind==='task'&&effectiveTaskCompleted(source)?{...t,status:'Hoàn thành'}:t,members,personal,originalFields,approvalStatus:approval?.status||source['Trạng thái phê duyệt']||(t.kind==='task'?'CHƯA XIN Ý KIẾN':'KHÔNG YÊU CẦU'),approvalHistory:approval?.history?JSON.stringify(approval.history):source['Lịch sử phê duyệt']||'[]',reviewer:approval?.reviewer||source['Tài khoản duyệt']||'',canReview:approval?.canReview===true,opinion:source['Ý kiến quản lý']||'',department:dept,priority:source['Mức độ ưu tiên']||'',writable,manage:manages,received:(receipts||[]).filter(x=>x.sender===x.request_id).map(x=>x.sender),rows:rows.reverse()};
  }
  if(b.action==='edit'){
  const title=str(b.title,180);must(title&&uuid(b.requestId)&&Number.isInteger(b.expected)&&/^\d{4}-\d{2}-\d{2}$/.test(b.due));
