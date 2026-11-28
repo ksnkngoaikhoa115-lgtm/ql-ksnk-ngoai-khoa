@@ -780,6 +780,28 @@ export async function POST(req:Request){const user=await actor();if(!user)return
   const granted=await featureScope(user,moduleName as 'tasks'|'reminders',action);
   if(granted==='none')return NextResponse.json({ok:false,error:'Quyền '+action+' đã bị thu hồi trong ma trận cấp quyền.'},{status:403});
  }
+ // New work uses the same matrix as CONNECT; validate every recipient against the HR catalog.
+ const workCreate=['tasks','reminders'].includes(moduleName)&&op==='save'&&!body.row_no;
+ let workCreateAllowed=false;
+ if(workCreate){
+  const scope=await featureScope(user,moduleName as 'tasks'|'reminders','create');
+  if(scope!=='team'&&scope!=='hospital')return NextResponse.json({ok:false,error:'Chưa được cấp quyền tạo tác vụ trong phạm vi tổ hoặc khoa.'},{status:403});
+  const proposed=canonical(moduleName,body);
+  const roster=getStaff(await readSheet(S.staff,true));
+  const recipients=text(proposed[moduleName==='tasks'?'Người thực hiện':'NGƯỜI LIÊN QUAN']).split(/[,;|]/).map(x=>x.trim()).filter(Boolean);
+  if(!recipients.length)return NextResponse.json({ok:false,error:'Hãy chọn người thực hiện hoặc người liên quan.'},{status:400});
+  for(const name of recipients){
+   const matches=roster.filter(p=>same(p.name,name));
+   if(matches.length!==1||staffEmploymentStatus(matches[0].status)!=='Đang làm việc')
+    return NextResponse.json({ok:false,error:'Nhân sự không còn làm việc hoặc cần đối chiếu danh mục: '+name},{status:400});
+   if(scope==='team'&&!managesDepartment(user,matches[0].department))
+    return NextResponse.json({ok:false,error:'Chỉ được giao/nhắc việc cho nhân viên thuộc bộ phận phụ trách.'},{status:403});
+  }
+  const department=text(proposed['Bộ phận']||proposed['Thuộc bộ phận']);
+  if(scope==='team'&&department&&!managesDepartment(user,department))
+   return NextResponse.json({ok:false,error:'Bộ phận công việc ngoài phạm vi phụ trách.'},{status:403});
+  workCreateAllowed=true;
+ }
  const workUpdate=(moduleName==='tasks'||moduleName==='reminders')&&['save','daily'].includes(op)&&Number(body.row_no)>0;
  const workRights=workUpdate?await getWorkEditRights(user,moduleName as 'tasks'|'reminders',Number(body.row_no)):null;
  if(workUpdate&&!workRights?.canSave)
@@ -789,7 +811,7 @@ export async function POST(req:Request){const user=await actor();if(!user)return
  const broadFeature=moduleName==='checklists'?'checklists':editFeature;
  const broadAction=op==='delete'?'delete':Number(body.row_no)>0?'edit':'create';
  const delegatedScope=broadFeature?await featureScope(user,broadFeature,broadAction):'none';
- if(!(user.admin||(user.legacy_operator&&user.work_view&&user.work_edit)||workRights?.canSave||delegatedScope==='hospital')){
+ if(!(user.admin||(user.legacy_operator&&user.work_view&&user.work_edit)||workRights?.canSave||workCreateAllowed||delegatedScope==='hospital')){
   const actionScope=moduleName==='checklists'?await featureScope(user,'checklists',op==='delete'?'delete':Number(body.row_no)>0?'edit':'create'):
    editFeature?await featureScope(user,editFeature,op==='delete'?'delete':Number(body.row_no)>0?'edit':'create'):'none';
   const team=actionScope==='team'||Boolean(user.team_lead&&user.work_view&&user.work_edit);
