@@ -271,3 +271,11 @@
 .reminder-title-cell>strong{display:block;color:#173b76;font-size:14px;margin-bottom:6px}
 .reminder-title-cell>div{white-space:pre-wrap;color:#465b75;font-size:13px;font-weight:400}
 .reminder-editor-grid>.wide{grid-column:1/-1}
+
+.work-center { display: grid; gap: 12px; min-width: 0; }
+.work-center > header { border-top: 3px solid #195e80; }
+.work-center > header h2, .briefing-heading h2 { margin: 0 0 12px; }
+.work-center > header nav { display: flex; flex-wrap: wrap; gap: 6px; }
+.work-center > .content-shell { width: 100%; min-width: 0; }
+.briefing-heading { border-left: 4px solid #195e80; }
+.briefing-heading p { margin: 4px 0 0; }

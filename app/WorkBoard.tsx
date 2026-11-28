@@ -1,6 +1,6 @@
 'use client';
 import {createContext,useContext,useEffect,useState} from 'react';
-import {workWarningReasons,type WorkWarningType} from '../lib/work-warning-policy';
+import {isWorkEnded,workWarningReasons,type WorkWarningType} from '../lib/work-warning-policy';
 
 type Kind='task'|'reminder';
 type Item={id:string;source_row:number;kind:Kind;title:string;note?:string;status:string;due:string;latest_message:string;mentioned:boolean;message_time:string;message_sender:string;owner_id:string;performers:string[];observers:string[];received_by?:string[];daily?:boolean;daily_done_today?:boolean};
@@ -43,7 +43,7 @@ export function WorkProvider({children,team=false,legacy=false}:{legacy?:boolean
   }
   void refresh();const timer=setInterval(refresh,16000);
   const trigger=()=>{void refresh()};
-  const onRead=(event:MessageEvent)=>{if(event.origin===location.origin&&event.data?.type==='ksnk-work-read')reload(x=>x+1)};
+  const onRead=(event:MessageEvent)=>{if(event.origin===location.origin&&['ksnk-work-read','ksnk-work-updated'].includes(event.data?.type))reload(x=>x+1)};
   window.addEventListener('focus',trigger);window.addEventListener('ksnk-work-closed',trigger);window.addEventListener('message',onRead);
   return ()=>{active=false;clearInterval(timer);window.removeEventListener('focus',trigger);window.removeEventListener('ksnk-work-closed',trigger);window.removeEventListener('message',onRead)};
  },[revision]);
@@ -155,4 +155,24 @@ export default function WorkBoard({kind,home=false,manager=false,who=''}:{kind?:
    </article>
   })}</div>
  </section></main>;
+}
+
+export function WorkAgenda(){
+ const {rows,names,open,ready,error}=useWorkFeed();
+ const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}).format(new Date());
+ const [day,setDay]=useState(today);
+ const entries=rows.filter(({item})=>item.due===day||
+  (item.daily&&day>=today&&(!item.due||item.due<=day)&&!isWorkEnded(item.status)))
+  .sort((a,b)=>a.item.title.localeCompare(b.item.title,'vi'));
+ return <section className="panel-card">
+  <div className="toolbar-line"><h3>Lịch công việc</h3>
+   <label>Ngày xem <input type="date" value={day} onChange={e=>setDay(e.target.value||today)}/></label>
+   <button type="button" onClick={()=>setDay(today)}>Hôm nay</button>
+  </div>
+  {error?<p role="alert">{error}</p>:!ready?<p>Đang tải lịch…</p>:entries.length?
+   <div className="table-wrap"><table><thead><tr><th>Công việc</th><th>Loại</th><th>Người thực hiện</th><th>Trạng thái</th></tr></thead>
+    <tbody>{entries.map(({item})=><tr key={item.id}><td><button className="edit-btn" onClick={()=>open(item.id)}>{item.title}</button></td>
+    <td>{item.daily?'Nhắc hằng ngày':labels[item.kind]}</td><td>{item.performers.map(id=>names[id]||'Thành viên').join(', ')||'—'}</td><td>{item.status}</td></tr>)}</tbody>
+   </table></div>:<p>Không có công việc theo lịch ngày đã chọn.</p>}
+ </section>;
 }

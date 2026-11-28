@@ -92,7 +92,11 @@ export default function Dock(){
     }
    }catch(e){if(active)setError(String(e))}finally{busy=false}
   }
-  void refresh();const timer=setInterval(refresh,12000);window.addEventListener('focus',refresh);return()=>{active=false;clearInterval(timer);window.removeEventListener('focus',refresh)}
+  const onMessage=(event:MessageEvent)=>{
+   if(event.origin===location.origin&&['ksnk-work-read','ksnk-work-updated'].includes(event.data?.type))void refresh()
+  }
+  window.addEventListener('message',onMessage)
+  void refresh();const timer=setInterval(refresh,12000);window.addEventListener('focus',refresh);return()=>{active=false;clearInterval(timer);window.removeEventListener('focus',refresh);window.removeEventListener('message',onMessage)}
  },[open,offset])
  async function ack(id:number,handled:boolean){try{await load({action:'ackEvent',eventId:id,handled});setEvents(old=>handled?old.filter(e=>e.id!==id):old.map(e=>e.id===id?{...e,read_at:new Date().toISOString()}:e))}catch(e){setError(String(e))}}
  const unread=Object.values(badges).reduce((a,b)=>a+b,0)+Number(events[0]?.unread_total??events.filter(e=>!e.read_at).length)

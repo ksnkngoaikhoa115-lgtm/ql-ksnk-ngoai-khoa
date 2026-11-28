@@ -10,11 +10,11 @@ export type WorkAlertItem={
 }
 export type WorkAlertRow={item:WorkAlertItem;unread:number}
 export type WorkWarningType='Mới giao'|'Đến hạn hôm nay'|'Quá hạn'|'Tin chưa đọc'|'Nhắc hằng ngày'
-const ended=(status:string)=>['hoan thanh','da xong','huy'].includes(
+export const isWorkEnded=(status:string)=>['hoan thanh','da xong','huy'].includes(
  status.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').trim()
 )
 export function workWarningReasons(row:WorkAlertRow,who:string,supervisor:boolean,today:string):WorkWarningType[]{
- const item=row.item,done=ended(item.status||''),recipients=item.performers||[],received=item.received_by||[]
+ const item=row.item,done=isWorkEnded(item.status||''),recipients=item.performers||[],received=item.received_by||[]
  const own=recipients.includes(who)
  const unconfirmed=recipients.some(id=>!received.includes(id))
  const assignedNew=!done&&item.status==='Mới'&&(

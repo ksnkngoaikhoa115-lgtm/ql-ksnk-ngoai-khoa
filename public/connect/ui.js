@@ -4,6 +4,11 @@ const units={surgery:'Bệnh viện Ngoại khoa 115 Nghệ An'};
 const embeddedWork=(new URLSearchParams(location.search).has('row')||new URLSearchParams(location.search).has('inline'))&&window.parent!==window;
 if(embeddedWork)document.documentElement.classList.add('work-embed');
 if(new URLSearchParams(location.search).has('chatOnly'))document.documentElement.classList.add('nk-chat-only');
+const utilityFrame=window.parent!==window&&new URLSearchParams(location.search).has('utility');
+const chatFrame=utilityFrame&&location.hash==='#chat';
+function notifyParent(type,thread){
+ if(window.parent!==window)window.parent.postMessage({type,thread},location.origin);
+}
 const names={all:'Tổng quan',task:'Việc được giao',reminder:'Nhắc việc',chat:'Trao đổi',admin:'Quản trị nhân viên'};
 const statuses=['Mới','Đã nhận','Đang thực hiện','Hoàn thành'];
 const hrRole=position=>{const p=String(position||'').toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').trim();return ['truong khoa','dieu duong truong'].includes(p)?'chief':p==='to truong'?'team':p?'staff':''};
@@ -60,6 +65,11 @@ async function start(){
 }
 function dashboard(){
  const a=state.me;state.screen++;
+ if(chatFrame){
+  $('#dock').hidden=true;
+  $('#app').innerHTML='<section class="bar"><h2 id="heading">Trao đổi riêng</h2><div id="actions" class="actions"></div></section><nav id="tabs" hidden></nav><div id="latest" hidden></div><section id="rows" class="list"></section><div id="pager" class="actions"></div>';
+  paint();return;
+ }
  $('#app').innerHTML='<div class="bar"><div>'+esc(units.surgery)+'</div><div class="actions"><button id="sound">'+(audio?'Tắt chuông':'Bật chuông')+'</button><select id="soundMode" aria-label="Kiểu chuông">'+options({normal:'Chuông thường',urgent:'Khẩn · lặp đến khi đọc'},localStorage.cxSoundMode||'normal')+'</select><button id="change">Đổi mã</button><button id="logout">Đăng xuất</button></div></div><section class="hero"><h1>'+'Công việc của tôi'+'</h1><p>Xin chào '+esc(a.name)+'. Theo dõi công việc và trao đổi của đơn vị.</p>'+((a.admin||a.legacy_operator)?'<a class="btn" href="/ngoai-khoa">Về trang nghiệp vụ</a>':'')+'</section><nav class="tabs" id="tabs"></nav><section class="bar"><h2 id="heading"></h2><div id="actions" class="actions"></div></section><div id="latest" class="actions" aria-live="polite"></div><section id="rows" class="list"></section><div id="pager" class="actions"></div>';
  if($('#scope'))$('#scope').onchange=e=>{state.scope=e.target.value;state.offset=0;dashboard();run(refresh)};
  $('#logout').onclick=()=>run(async()=>{await request('/api/auth',undefined,'DELETE');state.me=null;login()});
@@ -68,7 +78,11 @@ function dashboard(){
  paint();
 }
 function tone(){if(!audio||audio.state!=='running')return;const o=audio.createOscillator(),g=audio.createGain();o.connect(g);g.connect(audio.destination);o.frequency.value=650;g.gain.setValueAtTime(.07,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.35);o.start();o.stop(audio.currentTime+.36);}
-function tab(k){state.tab=k;state.rows=[];state.offset=0;state.screen++;paint();run(refresh);}
+function tab(k){
+ if(utilityFrame&&['all','task','reminder','chat'].includes(k)){
+  window.top.location.assign(k==='all'?'/ngoai-khoa':'/ngoai-khoa?work='+k);return;
+ }
+ state.tab=k;state.rows=[];state.offset=0;state.screen++;paint();run(refresh);}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b&&state.me)tab(b.dataset.tab)});
 async function refresh(){
  if(!state.me||new URLSearchParams(location.search).has('inline'))return;const current=++state.screen;
@@ -181,12 +195,15 @@ async function markSeen(){
  const s=$('#stream'),split=$('.split');if(!state.thread||!s||(window.frameElement&&!window.frameElement.getClientRects().length)||document.hidden||!$('#modal').open||s.scrollHeight-s.scrollTop-s.clientHeight>45)return;
  if(matchMedia('(max-width:800px)').matches&&split.dataset.view==='detail')return;
  if(state.seen>=state.seq)return;const n=state.seq,id=state.thread;await api('read',{id,seq:n});if(state.thread===id)state.seen=Math.max(state.seen,n);
- if(embeddedWork&&window.parent!==window)window.parent.postMessage({type:'ksnk-work-read',thread:id},location.origin);
+ notifyParent('ksnk-work-read',id);
 }
 async function openThread(id){
  const epoch=state.dialog;
  const r=await api('thread',{id});if(state.dialog!==epoch)return;
 
+ if(utilityFrame&&['task','reminder'].includes(r.item.kind)){
+  window.top.location.assign('/ngoai-khoa?work='+r.item.kind+'&thread='+encodeURIComponent(id));return;
+ }
  state.members=r.members;const t=r.item,isChat=t.kind==='chat',canUpdate=r.writable&&(r.manage||[t.owner_id,...t.performers,...t.observers].includes(state.me.id));
  const shared=canUpdate;
  const summaryFacts='<div class="details pane"><h3>'+names[t.kind]+'</h3><p>Đơn vị · '+esc(t.units.map(x=>units[x]).join(' / '))+'</p><p>Người tạo · '+esc(t.owner_id?person(t.owner_id):'Chưa ghi trong sổ')+'</p><p>Người thực hiện · '+esc(t.performers.map(person).join(', '))+'</p><p>Người liên quan · '+esc(t.observers.map(person).join(', ')||'—')+'</p><p style="white-space:pre-wrap">'+esc(t.note)+'</p><p>Ngày '+(t.kind==='reminder'?'nhắc':'đến hạn')+' · '+esc(t.due||'—')+'</p>'+(!isChat?'<p>Bộ phận · '+esc(r.department||'—')+'</p><p>Ghi chú cá nhân · '+esc(r.personal||'—')+'</p><p>Ý kiến quản lý · '+esc(r.opinion||'—')+'</p>':'')+(r.writable&&!isChat?'<button id="editTask">Cập nhật tác vụ</button>':'')+(canUpdate&&!isChat?'<label>Trạng thái<select id="progress">'+options(Object.fromEntries(statuses.map(x=>[x,x])),t.status)+'</select></label><button id="saveStatus">Lưu trạng thái</button>':'')+'</div>';
@@ -266,7 +283,7 @@ async function openThread(id){
  text.onkeydown=e=>{if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();form.requestSubmit()}};
  if(!r.writable)form.style.display='none';
  let pending=null;form.oninput=()=>{pending=null};
- form.onsubmit=e=>{e.preventDefault();run(async()=>{const fd=new FormData(form);if(!pending)pending={body:fd.get('body'),files:await upload(fd),id,requestId:crypto.randomUUID()};await api('send',pending);pending=null;form.reset();await updateThread();await refresh()},form.querySelector('.primary'))};
+ form.onsubmit=e=>{e.preventDefault();run(async()=>{const fd=new FormData(form);if(!pending)pending={body:fd.get('body'),files:await upload(fd),id,requestId:crypto.randomUUID()};await api('send',pending);notifyParent('ksnk-work-updated',id);pending=null;form.reset();await updateThread();await refresh()},form.querySelector('.primary'))};
  $('#messages').onclick=e=>{const b=e.target.closest('[data-file]');if(!b)return;run(async()=>{const f=await api('file',{id,seq:Number(b.dataset.msg),path:b.dataset.file});if(b.dataset.image==='1'){const img=new Image();img.alt=b.textContent;img.src=f.signedUrl;b.replaceWith(img)}else{const link=document.createElement('a');link.href=f.signedUrl;link.target='_blank';link.rel='noopener';link.textContent='Mở tài liệu ↗';b.replaceWith(link);link.click()}},b)};
  await markSeen();await refresh();
 }

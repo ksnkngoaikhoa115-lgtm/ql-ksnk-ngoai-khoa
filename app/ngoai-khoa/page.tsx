@@ -12,8 +12,10 @@ export default async function Dashboard({searchParams}:{searchParams:Promise<{wo
  if(!user)redirect('/');
  const manager=user.admin||(user.legacy_operator&&user.work_view&&user.work_edit);
  const grant=await reportAccess(user);
- const utility=['account','chat',...(user.admin?['admin','permissions']:[])].includes(params.work||'')&&!params.thread;
- return <WorkProvider legacy={manager} team={user.team_lead||(user.legacy_operator&&!manager)}><nav aria-label="Tài khoản bệnh viện" className="nk-account-nav">{utility&&<a href="/ngoai-khoa">Trang chủ</a>}<a href="/ngoai-khoa?work=account">{user.name} · Tài khoản</a>{user.admin&&<><a href="/ngoai-khoa?work=admin">Quản trị nhân viên</a><a href="/ngoai-khoa?work=permissions">Ma trận cấp quyền</a></>}</nav>
- {utility?(params.work==='permissions'?<iframe className="nk-workboard nk-permissions-frame" title="Ma trận cấp quyền" src="/ngoai-khoa/permissions"/>:<iframe className="nk-workboard" title="Tài khoản và trao đổi riêng" src={'/connect/index.html?utility=1#'+params.work}/>):<><Quick/>{manager&&<><Detail/><Images/></>}<LegacyDashboard matrixAccess={grant.scope!=='none'} initialReminder={params.work==='reminder'} manager={manager} who={user.id} openWork={Boolean(params.work)} creatorName={user.admin&&!user.staff_code?user.username:user.name}/></>}
+ const chat=params.work==='chat';
+ const chatQuery=chat&&params.thread?'&thread='+encodeURIComponent(params.thread):'';
+ const utility=['account','chat',...(user.admin?['admin','permissions']:[])].includes(params.work||'')&&(chat||!params.thread);
+ return <WorkProvider legacy={manager} team={user.team_lead||(user.legacy_operator&&!manager)}><nav aria-label="Tài khoản bệnh viện" className="nk-account-nav">{utility&&<a href="/ngoai-khoa">Trang chủ</a>}<a href="/ngoai-khoa?work=chat" aria-current={chat?'page':undefined}>CONNECT · Trao đổi</a><a href="/ngoai-khoa?work=account">{user.name} · Tài khoản</a>{user.admin&&<><a href="/ngoai-khoa?work=admin">Quản trị nhân viên</a><a href="/ngoai-khoa?work=permissions">Ma trận cấp quyền</a></>}</nav>
+ {utility?(params.work==='permissions'?<iframe className="nk-workboard nk-permissions-frame" title="Ma trận cấp quyền" src="/ngoai-khoa/permissions"/>:<iframe className="nk-workboard" title="Tài khoản và trao đổi riêng" src={'/connect/index.html?utility=1'+chatQuery+'#'+params.work}/>):<><Quick/>{manager&&<><Detail/><Images/></>}<LegacyDashboard matrixAccess={grant.scope!=='none'} initialReminder={params.work==='reminder'} manager={manager} who={user.id} openWork={Boolean(params.work)} creatorName={user.admin&&!user.staff_code?user.username:user.name}/></>}
  <Dock/></WorkProvider>;
 }
