@@ -849,3 +849,23 @@ th,td{padding:10px 11px;line-height:1.4}
 
 /* PowerPoint preparation: selectable regions and slide content. */
 .screen-export .screen-export-controls{width:100%;flex:1 1 100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}.report-export-section-picker{min-width:0;border:1px solid #b9cae9;border-radius:8px;background:#fff;padding:12px}.report-export-section-picker summary{cursor:pointer;font-weight:800;color:#173e68}.report-export-pick-list{display:grid;gap:8px;margin-top:10px;max-height:300px;overflow:auto}.screen-export .report-export-pick-list label{display:flex;min-width:0;align-items:flex-start;gap:8px;font-size:12px}.report-export-pick-actions{display:flex;gap:8px;flex-wrap:wrap}.report-export-options,.report-export-buttons{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:12px;align-items:center}.screen-export .report-export-options label{min-width:0}.report-export-buttons{justify-content:flex-end}.report-export-preview{flex:1 1 100%;min-width:0;border-top:1px solid #d6e1ef;padding-top:15px}.report-export-preview-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.report-export-preview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px;margin-top:12px}.report-export-preview-card,.report-export-slide-thumb{position:relative;display:flex!important;flex-direction:column;gap:8px;min-width:0;border:1px solid #d6e1ef;border-radius:10px;padding:12px;background:#fff}.report-export-preview-card img{width:100%;height:142px;object-fit:contain;background:#f4f7fb;border-radius:6px}.report-export-preview-card input{align-self:flex-start}.report-export-preview-card b{overflow-wrap:anywhere;font-size:13px}.report-export-slide-thumb{aspect-ratio:16/9;justify-content:center;align-items:center;text-align:center;border-top:5px solid #153e68;border-bottom:4px solid #cf4554;color:#153e68}.report-export-slide-thumb span{font-size:12px;color:#64748b}.report-image-error-actions{display:flex;flex-wrap:wrap;gap:6px}.report-image-error-actions button{min-height:38px}.report-image-failed{display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;text-align:center;padding:12px}.report-image-failed small{font-size:12px;font-weight:500;color:#9f2525}@media(max-width:760px){.screen-export .screen-export-controls{grid-template-columns:1fr}.screen-export .screen-export-controls label{min-width:0}.report-export-buttons{display:grid;width:100%}.report-export-buttons button{white-space:normal!important}.report-export-preview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.report-export-preview-card img{height:100px}}@media(max-width:420px){.report-export-preview-grid{grid-template-columns:minmax(0,1fr)}}
+
+.briefing-links,.briefing-legend{display:flex;flex-wrap:wrap;gap:1rem}
+.briefing-links a{color:#164a70;background:#edf3f8;border-radius:6px;padding:.55rem .85rem;font-weight:650}
+.briefing-board h3,.briefing-progress figcaption{font-size:1.1rem;font-weight:700;color:#173c59}
+.briefing-board .briefing-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:.65rem}
+.briefing-progress{margin:1.2rem 0 0;border-top:1px solid #dce5eb;padding-top:1rem}
+.briefing-legend{margin:.7rem 0;color:#40576a;font-size:.85rem}
+.briefing-legend span:before{content:'';display:inline-block;width:.7rem;height:.7rem;background:#50799c;margin-right:.35rem}
+.briefing-legend span:nth-child(2):before,.briefing-bar:nth-child(2) i{background:#178476}
+.briefing-legend span:nth-child(3):before,.briefing-bar:nth-child(3) i{background:#bc3949}
+.briefing-group{display:grid;grid-template-columns:minmax(6rem,24%) minmax(0,1fr);align-items:center;gap:1rem;padding:.45rem 0;border-top:1px solid #e8edf1}
+.briefing-bar{display:flex;align-items:center;gap:.4rem;padding-right:3rem;min-height:1.2rem}
+.briefing-bar i{height:.45rem;background:#50799c;border-radius:3px}
+.briefing-bar strong{font:600 .8rem system-ui;color:#26394d}
+.briefing-export-group{display:grid;gap:.5rem}
+.briefing-stats button{background:#f5f8fb;border:1px solid #d5e1e9;border-radius:9px;padding:12px;text-align:left;color:#244763;cursor:pointer}
+.briefing-stats button[aria-pressed=true]{outline:2px solid #235b7d}
+.briefing-stats button b,.briefing-stats button span{display:block}
+.briefing-stats button b{font-size:1.55rem}
+.briefing-stats button:nth-child(3) b{color:#a63343}

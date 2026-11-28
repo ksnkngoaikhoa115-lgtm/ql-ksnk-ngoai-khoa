@@ -6,15 +6,15 @@
 export type WorkAlertItem={
  id:string;kind:'task'|'reminder';title:string;status:string;due:string|null;
  owner_id:string;performers:string[];received_by?:string[];
- daily?:boolean;daily_done_today?:boolean
+ daily?:boolean;daily_done_today?:boolean;deadline?:string
 }
 export type WorkAlertRow={item:WorkAlertItem;unread:number}
-export type WorkWarningType='Mới giao'|'Đến hạn hôm nay'|'Quá hạn'|'Tin chưa đọc'|'Nhắc hằng ngày'
-const ended=(status:string)=>['hoan thanh','da xong','huy'].includes(
+export type WorkWarningType='Mới giao'|'Đến hạn hôm nay'|'Quá hạn'|'Tin chưa đọc'|'Nhắc hằng ngày'|'Đã đến ngày nhắc'
+export const isWorkEnded=(status:string)=>['hoan thanh','da xong','huy'].includes(
  status.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').trim()
 )
 export function workWarningReasons(row:WorkAlertRow,who:string,supervisor:boolean,today:string):WorkWarningType[]{
- const item=row.item,done=ended(item.status||''),recipients=item.performers||[],received=item.received_by||[]
+ const item=row.item,done=isWorkEnded(item.status||''),recipients=item.performers||[],received=item.received_by||[]
  const own=recipients.includes(who)
  const unconfirmed=recipients.some(id=>!received.includes(id))
  const assignedNew=!done&&item.status==='Mới'&&(
@@ -24,8 +24,10 @@ export function workWarningReasons(row:WorkAlertRow,who:string,supervisor:boolea
  const due=typeof item.due==='string'?item.due:''
  const types:WorkWarningType[]=[]
  if(assignedNew)types.push('Mới giao')
- if(!done&&!daily&&due===today)types.push('Đến hạn hôm nay')
- if(!done&&!daily&&due&&due<today)types.push('Quá hạn')
+ const deadline=item.kind==='reminder'?item.deadline:due
+ if(!done&&item.kind==='reminder'&&!daily&&due&&due<=today)types.push('Đã đến ngày nhắc')
+ if(!done&&deadline===today)types.push('Đến hạn hôm nay')
+ if(!done&&deadline&&deadline<today)types.push('Quá hạn')
  if(Number(row.unread)>0)types.push('Tin chưa đọc')
  if(daily&&!item.daily_done_today&&(!due||due<=today))types.push('Nhắc hằng ngày')
  return types

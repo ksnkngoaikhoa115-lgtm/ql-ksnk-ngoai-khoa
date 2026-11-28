@@ -3,12 +3,14 @@ import {useEffect,useMemo,useState} from 'react'
 type Scope='none'|'self'|'team'|'hospital'
 type Action='view'|'create'|'edit'|'delete'|'approve'|'history'|'export'
 type Matrix=Record<string,Partial<Record<Action,Scope>>>
-type Role='staff'|'team'|'chief'
+type Role='staff'|'team'|'chief'|'deputy'|'head_nurse'
 type RoleEntry={role:Role;grants:Matrix;version:string|null;baseline:Matrix}
 const roles:{id:Role;label:string;description:string}[]=[
  {id:'staff',label:'Nhân viên',description:'Mặc định cá nhân; quản trị viên có thể ủy quyền theo từng nghiệp vụ'},
  {id:'team',label:'Tổ trưởng',description:'Mặc định trong bộ phận phụ trách'},
- {id:'chief',label:'Trưởng khoa / Điều dưỡng trưởng',description:'Mặc định toàn khoa'}
+ {id:'chief',label:'Trưởng khoa',description:'Mặc định toàn khoa'},
+ {id:'deputy',label:'Phó khoa',description:'Mặc định trong bộ phận phụ trách. Có thể mở rộng theo nghiệp vụ.'},
+ {id:'head_nurse',label:'Điều dưỡng trưởng',description:'Mặc định toàn khoa'}
 ]
 const actions:Action[]=['view','create','edit','delete','approve','history','export']
 const labels:Record<Action,string>={view:'Xem',create:'Thêm mới',edit:'Sửa',delete:'Xóa',approve:'Phê duyệt',history:'Lịch sử',export:'Xuất Excel/PPT'}

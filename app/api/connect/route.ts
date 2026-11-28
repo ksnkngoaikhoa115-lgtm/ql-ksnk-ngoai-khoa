@@ -103,15 +103,17 @@ async function dispatch(req:Request){
  const patch:Record<string,unknown>={name:linked?.name||name,username,unit:b.unit,legacy_operator:b.legacy===true,active:b.active===true,version:randomUUID()};
  if(linked)patch.department=linked.department;
  if(b.role!==undefined){
- must(['chief','team','staff'].includes(b.role)&&typeof b.view==='boolean'&&typeof b.edit==='boolean'&&(!b.edit||b.view));
- patch.work_role_reviewed=true;patch.legacy_operator=b.role==='chief';patch.team_lead=b.role==='team';patch.work_view=b.view;patch.work_edit=b.edit;
- if(b.role!=='team')patch.team_department=null;
- if(b.role==='team'){
+ must(['chief','head_nurse','deputy','team','staff'].includes(b.role)&&typeof b.view==='boolean'&&typeof b.edit==='boolean'&&(!b.edit||b.view));
+ if(['deputy','head_nurse'].includes(b.role))must(linked,'Cần liên kết chức vụ trong hồ sơ nhân sự.',409);
+ patch.position_policy=['deputy','head_nurse'].includes(b.role)?b.role:null;
+ patch.work_role_reviewed=true;patch.legacy_operator=['chief','head_nurse'].includes(b.role);patch.team_lead=['deputy','team'].includes(b.role);patch.work_view=b.view;patch.work_edit=b.edit;
+ if(!patch.team_lead)patch.team_department=null;
+ if(patch.team_lead){
  const dep=str(linked?.department||b.department||'',150);must(dep,'Hãy chọn bộ phận của tổ trưởng.');
- must((await people(true)).some(p=>p.department===dep),'Bộ phận chưa có trong danh mục nhân sự.');patch.team_department=dep;
+ must(linked?.department===dep||(await people(true)).some(p=>p.department===dep),'Bộ phận chưa có trong danh mục nhân sự.');patch.team_department=dep;
  }
  }
- if(typeof b.canApproveWork==='boolean')patch.can_approve_work=b.canApproveWork&&b.edit===true&&['chief','team'].includes(b.role);
+ if(typeof b.canApproveWork==='boolean')patch.can_approve_work=b.canApproveWork&&b.edit===true&&['chief','head_nurse','deputy','team'].includes(b.role);
  if(b.staffCode){must(typeof b.staffCode==='string'&&b.staffCode.length<=150);patch.staff_code=b.staffCode;}
  if(b.code)patch.pending_login=false;
  if(b.code||!b.id){const code=str(b.code,72);must(code.length>=12&&Buffer.byteLength(code)<=72,'Mã cần ít nhất 12 ký tự và tối đa 72 byte.');patch.credential=await hash(code,12);}
@@ -147,7 +149,15 @@ async function dispatch(req:Request){
  const meta=await rpc('nk_warning_meta',{who:a.id,work_ids:page.map(row=>String(row.item.id))}) as
   Array<{id:string;received_by:string[];daily:boolean;daily_done_today:boolean}>;
  const byId=new Map(meta.map(entry=>[entry.id,entry]));
- return page.map(row=>({...row,item:{...row.item,...(byId.get(String(row.item.id))||{})}}));
+ const sourceIds=page.map(row=>Number(row.item.source_row)).filter(Number.isSafeInteger);
+ const fields=sourceIds.length?checked(await client.from('nk_legacy_rows')
+  .select('id,data')
+  .eq('sheet_name',b.kind==='task'?'GIAO VIỆC':'NHAC_VIEC_GHI_CHU').in('id',sourceIds))||[]:[];
+ const sources=new Map(fields.map(row=>[Number(row.id),row.data as Record<string,string>]));
+ return page.map(row=>{
+  const source=sources.get(Number(row.item.source_row));
+  return {...row,item:{...row.item,...byId.get(String(row.item.id)),lead:source?.['Phụ trách chính']||'',deadline:source?.['Hạn hoàn thành']||''}};
+ });
  }
  if(b.action==='board'){
  const screen=b.kind||'all';must(screen==='all'||kinds.includes(screen));

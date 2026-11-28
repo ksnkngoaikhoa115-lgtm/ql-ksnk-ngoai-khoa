@@ -4,9 +4,14 @@ const units={surgery:'Bệnh viện Ngoại khoa 115 Nghệ An'};
 const embeddedWork=(new URLSearchParams(location.search).has('row')||new URLSearchParams(location.search).has('inline'))&&window.parent!==window;
 if(embeddedWork)document.documentElement.classList.add('work-embed');
 if(new URLSearchParams(location.search).has('chatOnly'))document.documentElement.classList.add('nk-chat-only');
+const utilityFrame=window.parent!==window&&new URLSearchParams(location.search).has('utility');
+const chatFrame=utilityFrame&&location.hash==='#chat';
+function notifyParent(type,thread){
+ if(window.parent!==window)window.parent.postMessage({type,thread},location.origin);
+}
 const names={all:'Tổng quan',task:'Việc được giao',reminder:'Nhắc việc',chat:'Trao đổi',admin:'Quản trị nhân viên'};
 const statuses=['Mới','Đã nhận','Đang thực hiện','Hoàn thành'];
-const hrRole=position=>{const p=String(position||'').toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').trim();return ['truong khoa','dieu duong truong'].includes(p)?'chief':p==='to truong'?'team':p?'staff':''};
+const hrRole=position=>{const p=String(position||'').toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').trim();return p==='truong khoa'?'chief':p==='pho khoa'?'deputy':['dieu duong truong','dd truong'].includes(p)?'head_nurse':p==='to truong'?'team':p?'staff':''};
 const state={me:null,people:[],tab:'all',scope:'all',offset:0,rows:[],badges:{},screen:0,dialog:0,thread:null,seq:0,loading:false};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const accountLabel=p=>p?.admin&&!p.staff_code?p.username:p?.name;
@@ -60,6 +65,11 @@ async function start(){
 }
 function dashboard(){
  const a=state.me;state.screen++;
+ if(chatFrame){
+  $('#dock').hidden=true;
+  $('#app').innerHTML='<section class="bar"><h2 id="heading">Trao đổi riêng</h2><div id="actions" class="actions"></div></section><nav id="tabs" hidden></nav><div id="latest" hidden></div><section id="rows" class="list"></section><div id="pager" class="actions"></div>';
+  paint();return;
+ }
  $('#app').innerHTML='<div class="bar"><div>'+esc(units.surgery)+'</div><div class="actions"><button id="sound">'+(audio?'Tắt chuông':'Bật chuông')+'</button><select id="soundMode" aria-label="Kiểu chuông">'+options({normal:'Chuông thường',urgent:'Khẩn · lặp đến khi đọc'},localStorage.cxSoundMode||'normal')+'</select><button id="change">Đổi mã</button><button id="logout">Đăng xuất</button></div></div><section class="hero"><h1>'+'Công việc của tôi'+'</h1><p>Xin chào '+esc(a.name)+'. Theo dõi công việc và trao đổi của đơn vị.</p>'+((a.admin||a.legacy_operator)?'<a class="btn" href="/ngoai-khoa">Về trang nghiệp vụ</a>':'')+'</section><nav class="tabs" id="tabs"></nav><section class="bar"><h2 id="heading"></h2><div id="actions" class="actions"></div></section><div id="latest" class="actions" aria-live="polite"></div><section id="rows" class="list"></section><div id="pager" class="actions"></div>';
  if($('#scope'))$('#scope').onchange=e=>{state.scope=e.target.value;state.offset=0;dashboard();run(refresh)};
  $('#logout').onclick=()=>run(async()=>{await request('/api/auth',undefined,'DELETE');state.me=null;login()});
@@ -68,7 +78,11 @@ function dashboard(){
  paint();
 }
 function tone(){if(!audio||audio.state!=='running')return;const o=audio.createOscillator(),g=audio.createGain();o.connect(g);g.connect(audio.destination);o.frequency.value=650;g.gain.setValueAtTime(.07,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.35);o.start();o.stop(audio.currentTime+.36);}
-function tab(k){state.tab=k;state.rows=[];state.offset=0;state.screen++;paint();run(refresh);}
+function tab(k){
+ if(utilityFrame&&['all','task','reminder','chat'].includes(k)){
+  window.top.location.assign(k==='all'?'/ngoai-khoa':'/ngoai-khoa?work='+k);return;
+ }
+ state.tab=k;state.rows=[];state.offset=0;state.screen++;paint();run(refresh);}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b&&state.me)tab(b.dataset.tab)});
 async function refresh(){
  if(!state.me||new URLSearchParams(location.search).has('inline'))return;const current=++state.screen;
@@ -142,14 +156,20 @@ function submit(fn){$('#edit').onsubmit=e=>{e.preventDefault();const form=e.curr
 async function account(x,staff){
  if(!staff&&x?.staff_code){try{const catalog=state.staffDirectory||await api('directory');state.staffDirectory=catalog;staff=catalog.staff?.find(entry=>entry.code===x.staff_code&&entry.unit===x.unit);}catch(e){notice('Không tải được hồ sơ nhân sự: '+e.message);}}
  const position=staff?.position||'',employment=staff?.employmentStatus||'';
- modal(x?'Cập nhật nhân viên':'Cấp tài khoản','<form id="edit"><label>Họ tên<input name="name" required value="'+esc(staff?.name||x?.name)+'"></label><label>Tên đăng nhập<input name="username" pattern="[a-z0-9._\\-]{3,50}" required value="'+esc(x?.pending_login?'':x?.username)+'"></label><label>Đơn vị<select name="unit">'+options(units,staff?.unit||x?.unit||'surgery')+'</select></label><label>Chức vụ trong Nhân sự<input readonly value="'+esc(position||'Chưa liên kết hồ sơ')+'"></label><label>Trạng thái nhân sự<input readonly value="'+esc(employment||'Chưa đối chiếu')+'"></label><label>Mã NV<input readonly value="'+esc(staff?.code||x?.staff_code||'Chưa liên kết')+'"></label><label>Mã mới '+(x&&!x.pending_login?'(để trống để giữ mã)':'')+'<input type="password" name="code" minlength="12" '+(x&&!x.pending_login?'':'required')+'></label><label>Trạng thái<select name="active">'+options({on:'Đang hoạt động',off:'Khóa tài khoản'},x?.active===false&&!x.pending_login?'off':'on')+'</select></label><label>Phân quyền nghiệp vụ<select name="role">'+options({staff:'Nhân viên · hồ sơ cá nhân',team:'Tổ trưởng · tất cả nhân viên trong bộ phận',chief:'Trưởng khoa / Điều dưỡng trưởng · toàn khoa'},x?.legacy_operator?'chief':x?.team_lead?'team':'staff')+'</select></label><div class="actions"><button type="button" id="applyHrRole">Đồng bộ vai trò theo Chức vụ</button><small id="hrRoleNote"></small></div><label id="teamDept">Bộ phận phụ trách<select name="department"><option value="">Chọn bộ phận</option>'+options(Object.fromEntries([...new Set(state.people.map(p=>p.department).filter(Boolean))].map(d=>[d,d])),x?.team_department||x?.department||staff?.department)+'</select></label><fieldset><legend>Quyền xem và cập nhật công việc của nhân viên</legend><label><input type="checkbox" name="view" '+(x?.work_view===false?'':'checked')+'> Được xem</label><label><input type="checkbox" name="editWork" '+(x?.work_edit===false?'':'checked')+'> Được sửa</label></fieldset><button class="primary">Lưu tài khoản</button></form>');
+ const suggested=hrRole(position);
+ const roleNames={chief:'Trưởng khoa',deputy:'Phó khoa',head_nurse:'Điều dưỡng trưởng',team:'Tổ trưởng',staff:'Nhân viên'};
+ const stored=x?.position_policy||(x?.legacy_operator?'chief':x?.team_lead?'team':'staff');
+ const allowed=suggested?new Set(['staff',suggested,...(suggested==='deputy'?['team','chief']:[]),...(x&&stored==='chief'&&suggested==='head_nurse'?['chief']:[])]):new Set(['chief','team','staff']);
+ if(x&&!x.pending_login)allowed.add(stored);
+ const roleChoices=Object.fromEntries(Object.entries(roleNames).filter(([key])=>allowed.has(key)));
+ modal(x?'Cập nhật nhân viên':'Cấp tài khoản','<form id="edit"><label>Họ tên<input name="name" required value="'+esc(staff?.name||x?.name)+'"></label><label>Tên đăng nhập<input name="username" pattern="[a-z0-9._\\-]{3,50}" required value="'+esc(x?.pending_login?'':x?.username)+'"></label><label>Đơn vị<select name="unit">'+options(units,staff?.unit||x?.unit||'surgery')+'</select></label><label>Chức vụ trong Nhân sự<input readonly value="'+esc(position||'Chưa liên kết hồ sơ')+'"></label><label>Trạng thái nhân sự<input readonly value="'+esc(employment||'Chưa đối chiếu')+'"></label><label>Mã NV<input readonly value="'+esc(staff?.code||x?.staff_code||'Chưa liên kết')+'"></label><label>Mã mới '+(x&&!x.pending_login?'(để trống để giữ mã)':'')+'<input type="password" name="code" minlength="12" '+(x&&!x.pending_login?'':'required')+'></label><label>Trạng thái<select name="active">'+options({on:'Đang hoạt động',off:'Khóa tài khoản'},x?.active===false&&!x.pending_login?'off':'on')+'</select></label><label>Phân quyền nghiệp vụ<select name="role">'+options(roleChoices,x&&!x.pending_login?stored:suggested||'staff')+'</select></label><div class="actions"><button type="button" id="applyHrRole">Đồng bộ vai trò theo Chức vụ</button><small id="hrRoleNote"></small></div><label id="teamDept">Bộ phận phụ trách<select name="department"><option value="">Chọn bộ phận</option>'+options(Object.fromEntries([...new Set(state.people.map(p=>p.department).filter(Boolean))].map(d=>[d,d])),x?.team_department||x?.department||staff?.department)+'</select></label><fieldset><legend>Quyền xem và cập nhật công việc của nhân viên</legend><label><input type="checkbox" name="view" '+(x?.work_view===false?'':'checked')+'> Được xem</label><label><input type="checkbox" name="editWork" '+(x?.work_edit===false?'':'checked')+'> Được sửa</label></fieldset><button class="primary">Lưu tài khoản</button></form>');
  const roles=$('#edit').elements;
  if(state.reviewSettingsReady){const label=document.createElement('label'),cb=document.createElement('input');cb.type='checkbox';cb.name='canApproveWork';cb.checked=!!x?.can_approve_work;label.append(cb,' Được phê duyệt tác vụ khi được chỉ định');roles.role.closest('label').after(label);}
- const suggested=hrRole(position),tip=$('#hrRoleNote'),syncButton=$('#applyHrRole');
- if(tip)tip.textContent=employment==='Đã nghỉ việc'?'Đã nghỉ việc: tài khoản cần khóa; hồ sơ và lịch sử được giữ.':suggested?'Chức vụ gợi ý vai trò '+({chief:'Trưởng khoa / Điều dưỡng trưởng',team:'Tổ trưởng',staff:'Nhân viên'}[suggested])+'. Chỉ cấp khi quản trị viên xác nhận.':'Hãy chuẩn hóa Chức vụ trong Nhân sự.';
- if(syncButton){syncButton.disabled=!suggested||employment==='Đã nghỉ việc';syncButton.onclick=()=>{roles.role.value=suggested;roles.view.checked=true;roles.editWork.checked=true;if(suggested==='team')roles.department.value=staff?.department||'';syncRole();};}
+ const tip=$('#hrRoleNote'),syncButton=$('#applyHrRole');
+ if(tip)tip.textContent=employment==='Đã nghỉ việc'?'Đã nghỉ việc: tài khoản cần khóa; hồ sơ và lịch sử được giữ.':suggested?'Chức vụ gợi ý vai trò '+roleNames[suggested]+'. Chỉ cấp khi quản trị viên xác nhận.':'Hãy chuẩn hóa Chức vụ trong Nhân sự.';
+ if(syncButton){syncButton.disabled=!suggested||employment==='Đã nghỉ việc';syncButton.onclick=()=>{roles.role.value=suggested;roles.view.checked=true;roles.editWork.checked=true;if(['deputy','team'].includes(suggested))roles.department.value=staff?.department||'';syncRole();};}
  if(employment==='Đã nghỉ việc'){roles.active.value='off';roles.active.disabled=true;}
- function syncRole(){roles.editWork.disabled=!roles.view.checked;if(!roles.view.checked)roles.editWork.checked=false;$('#teamDept').hidden=roles.role.value!=='team';}
+ function syncRole(){roles.editWork.disabled=!roles.view.checked;if(!roles.view.checked)roles.editWork.checked=false;$('#teamDept').hidden=!['team','deputy'].includes(roles.role.value);}
  roles.role.onchange=roles.view.onchange=syncRole;syncRole();
  if(staff||x?.staff_code){$('#edit [name=name]').readOnly=true;$('#edit [name=unit]').disabled=true;}
  submit(async fd=>{await api('account',{...Object.fromEntries(fd),unit:staff?.unit||$('#edit [name=unit]').value,staffCode:staff?.code||x?.staff_code,id:x?.id,version:x?.version,active:employment==='Đã nghỉ việc'?false:fd.get('active')==='on',role:fd.get('role'),department:fd.get('department'),view:fd.has('view'),edit:fd.has('editWork'),canApproveWork:state.reviewSettingsReady?fd.has('canApproveWork'):undefined});state.people=(await api('me')).people;close();paint();notice('Đã lưu tài khoản.')});
@@ -181,12 +201,15 @@ async function markSeen(){
  const s=$('#stream'),split=$('.split');if(!state.thread||!s||(window.frameElement&&!window.frameElement.getClientRects().length)||document.hidden||!$('#modal').open||s.scrollHeight-s.scrollTop-s.clientHeight>45)return;
  if(matchMedia('(max-width:800px)').matches&&split.dataset.view==='detail')return;
  if(state.seen>=state.seq)return;const n=state.seq,id=state.thread;await api('read',{id,seq:n});if(state.thread===id)state.seen=Math.max(state.seen,n);
- if(embeddedWork&&window.parent!==window)window.parent.postMessage({type:'ksnk-work-read',thread:id},location.origin);
+ notifyParent('ksnk-work-read',id);
 }
 async function openThread(id){
  const epoch=state.dialog;
  const r=await api('thread',{id});if(state.dialog!==epoch)return;
 
+ if(utilityFrame&&['task','reminder'].includes(r.item.kind)){
+  window.top.location.assign('/ngoai-khoa?work='+r.item.kind+'&thread='+encodeURIComponent(id));return;
+ }
  state.members=r.members;const t=r.item,isChat=t.kind==='chat',canUpdate=r.writable&&(r.manage||[t.owner_id,...t.performers,...t.observers].includes(state.me.id));
  const shared=canUpdate;
  const summaryFacts='<div class="details pane"><h3>'+names[t.kind]+'</h3><p>Đơn vị · '+esc(t.units.map(x=>units[x]).join(' / '))+'</p><p>Người tạo · '+esc(t.owner_id?person(t.owner_id):'Chưa ghi trong sổ')+'</p><p>Người thực hiện · '+esc(t.performers.map(person).join(', '))+'</p><p>Người liên quan · '+esc(t.observers.map(person).join(', ')||'—')+'</p><p style="white-space:pre-wrap">'+esc(t.note)+'</p><p>Ngày '+(t.kind==='reminder'?'nhắc':'đến hạn')+' · '+esc(t.due||'—')+'</p>'+(!isChat?'<p>Bộ phận · '+esc(r.department||'—')+'</p><p>Ghi chú cá nhân · '+esc(r.personal||'—')+'</p><p>Ý kiến quản lý · '+esc(r.opinion||'—')+'</p>':'')+(r.writable&&!isChat?'<button id="editTask">Cập nhật tác vụ</button>':'')+(canUpdate&&!isChat?'<label>Trạng thái<select id="progress">'+options(Object.fromEntries(statuses.map(x=>[x,x])),t.status)+'</select></label><button id="saveStatus">Lưu trạng thái</button>':'')+'</div>';
@@ -266,7 +289,7 @@ async function openThread(id){
  text.onkeydown=e=>{if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();form.requestSubmit()}};
  if(!r.writable)form.style.display='none';
  let pending=null;form.oninput=()=>{pending=null};
- form.onsubmit=e=>{e.preventDefault();run(async()=>{const fd=new FormData(form);if(!pending)pending={body:fd.get('body'),files:await upload(fd),id,requestId:crypto.randomUUID()};await api('send',pending);pending=null;form.reset();await updateThread();await refresh()},form.querySelector('.primary'))};
+ form.onsubmit=e=>{e.preventDefault();run(async()=>{const fd=new FormData(form);if(!pending)pending={body:fd.get('body'),files:await upload(fd),id,requestId:crypto.randomUUID()};await api('send',pending);notifyParent('ksnk-work-updated',id);pending=null;form.reset();await updateThread();await refresh()},form.querySelector('.primary'))};
  $('#messages').onclick=e=>{const b=e.target.closest('[data-file]');if(!b)return;run(async()=>{const f=await api('file',{id,seq:Number(b.dataset.msg),path:b.dataset.file});if(b.dataset.image==='1'){const img=new Image();img.alt=b.textContent;img.src=f.signedUrl;b.replaceWith(img)}else{const link=document.createElement('a');link.href=f.signedUrl;link.target='_blank';link.rel='noopener';link.textContent='Mở tài liệu ↗';b.replaceWith(link);link.click()}},b)};
  await markSeen();await refresh();
 }
