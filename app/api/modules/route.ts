@@ -797,7 +797,16 @@ export async function POST(req:Request){const user=await actor();if(!user)return
    if(scope==='team'&&!managesDepartment(user,matches[0].department))
     return NextResponse.json({ok:false,error:'Chỉ được giao/nhắc việc cho nhân viên thuộc bộ phận phụ trách.'},{status:403});
   }
-  const department=text(proposed['Bộ phận']||proposed['Thuộc bộ phận']);
+  const primary=text(proposed['Phụ trách chính']).trim();
+  const primaryName=moduleName==='tasks'?(primary||(recipients.length===1?recipients[0]:'')):'';
+  if(primaryName){
+   const person=roster.filter(p=>same(p.name,primaryName));
+   if(person.length!==1||!recipients.some(name=>same(name,primaryName))||!person[0].department)
+    return NextResponse.json({ok:false,error:'Người phụ trách chính phải thuộc danh sách người thực hiện và có bộ phận hợp lệ.'},{status:400});
+   body.lead=person[0].name;
+   body.department=person[0].department;
+  }
+  const department=text(body.department||proposed['Bộ phận']||proposed['Thuộc bộ phận']);
   if(scope==='team'&&department&&!managesDepartment(user,department))
    return NextResponse.json({ok:false,error:'Bộ phận công việc ngoài phạm vi phụ trách.'},{status:403});
   workCreateAllowed=true;
@@ -954,7 +963,23 @@ export async function POST(req:Request){const user=await actor();if(!user)return
  for(const name of selected){if(staffList.filter(p=>same(p.name,name)&&staffEmploymentStatus(p.status)==='Đang làm việc').length!==1||staffList.filter(p=>same(p.name,name)).length!==1)throw new Error('Cần đối chiếu nhân sự: '+name);}
  for(const key of ['Mã NV','Mã nhân viên','Mã người thực hiện','Mã người chịu trách nhiệm','staffId'])data[key]='';
  }
- data['Người thực hiện']=[...new Set(selected)].join(', ');if(body.row_no&&!existing)throw new Error('Phiếu không còn tồn tại.');data['Người giao việc']=existing?pick(existing.data,['Người giao việc','Người giao','Người tạo']):user.name;data['Bộ phận']=text(data['Bộ phận'])||staffList.find(x=>same(x.name,data['Người thực hiện']))?.department||'';data['Thuộc bộ phận']=data['Bộ phận'];}if(moduleName==='issues'){if(!text(data['Tồn tại / Sự cố / Kiến nghị']))throw new Error('Nội dung tồn tại/kiến nghị không được để trống.');const staffList=getStaff(await readSheet(S.staff));const catalogDepartments=departmentOptions(await readSheet(S.departments),staffList);if(text(data['Bộ phận'])&&!catalogDepartments.some(x=>same(x,data['Bộ phận'])))throw new Error('Bộ phận tồn tại/kiến nghị phải được chọn từ danh mục bộ phận.');if(text(data['Người phụ trách'])&&!staffList.some(x=>same(x.name,data['Người phụ trách'])))throw new Error('Người phụ trách phải được chọn từ danh mục nhân viên.');const sourceStatuses=(await readSheet(S.issues)).map(row=>pick(row.data,['Trạng thái'])).filter(Boolean);const allowedStatuses=[...new Set([...ISSUE_STATUSES,...sourceStatuses])];if(!allowedStatuses.some(x=>same(x,data['Trạng thái'])))throw new Error('Trạng thái tồn tại/kiến nghị không hợp lệ.');}if((moduleName==='reminders'||moduleName==='tasks')&&!body.row_no){
+ // Resolve the primary responsible person's department on the server. Preserve historical
+ // department on unrelated edits; do not silently move a previously saved task.
+ const selectedLead=text(data['Phụ trách chính']).trim()||(!existing&&selected.length===1?selected[0]:'');
+ const assignmentChanged=!existing||!same(selectedLead,previous['Phụ trách chính'])||!same(data['Người thực hiện'],previous['Người thực hiện'])||!same(data['Bộ phận'],pick(previous,['Bộ phận','Thuộc bộ phận']));
+ if(selectedLead&&assignmentChanged){
+  const matches=staffList.filter(person=>same(person.name,selectedLead));
+  if(matches.length!==1||!matches[0].department||staffEmploymentStatus(matches[0].status)!=='Đang làm việc'||!selected.some(name=>same(name,selectedLead)))
+   return NextResponse.json({ok:false,error:'Không xác định được bộ phận của người phụ trách chính.'},{status:400});
+  const scope=await featureScope(user,'tasks',existing?'edit':'create');
+  if(scope!=='hospital'&&(!managesDepartment(user,matches[0].department)||scope!=='team'))
+   return NextResponse.json({ok:false,error:'Không được chuyển bộ phận công việc ngoài phạm vi được cấp.'},{status:403});
+  if(existing&&scope==='team'&&!selected.every(name=>staffList.some(person=>same(person.name,name)&&managesDepartment(user,person.department))))
+   return NextResponse.json({ok:false,error:'Người thực hiện ngoài bộ phận phụ trách.'},{status:403});
+  data['Phụ trách chính']=matches[0].name;
+  data['Bộ phận']=matches[0].department;
+ }
+ data['Người thực hiện']=[...new Set(selected)].join(', ');if(body.row_no&&!existing)throw new Error('Phiếu không còn tồn tại.');data['Người giao việc']=existing?pick(existing.data,['Người giao việc','Người giao','Người tạo']):user.name;data['Bộ phận']=text(data['Bộ phận'])||staffList.find(x=>same(x.name,selected[0]))?.department||'';data['Thuộc bộ phận']=data['Bộ phận'];}if(moduleName==='issues'){if(!text(data['Tồn tại / Sự cố / Kiến nghị']))throw new Error('Nội dung tồn tại/kiến nghị không được để trống.');const staffList=getStaff(await readSheet(S.staff));const catalogDepartments=departmentOptions(await readSheet(S.departments),staffList);if(text(data['Bộ phận'])&&!catalogDepartments.some(x=>same(x,data['Bộ phận'])))throw new Error('Bộ phận tồn tại/kiến nghị phải được chọn từ danh mục bộ phận.');if(text(data['Người phụ trách'])&&!staffList.some(x=>same(x.name,data['Người phụ trách'])))throw new Error('Người phụ trách phải được chọn từ danh mục nhân viên.');const sourceStatuses=(await readSheet(S.issues)).map(row=>pick(row.data,['Trạng thái'])).filter(Boolean);const allowedStatuses=[...new Set([...ISSUE_STATUSES,...sourceStatuses])];if(!allowedStatuses.some(x=>same(x,data['Trạng thái'])))throw new Error('Trạng thái tồn tại/kiến nghị không hợp lệ.');}if((moduleName==='reminders'||moduleName==='tasks')&&!body.row_no){
  const created=await db().rpc('nk_create_work',{sheet,fields:data,who:user.id});
  if(created.error)throw created.error;
  return NextResponse.json({ok:true,row_no:created.data,id:text(data.ID||data['MÃ NHẮC VIỆC'])});
