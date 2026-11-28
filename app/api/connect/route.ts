@@ -87,9 +87,10 @@ async function dispatch(req:Request){
  if(b.action==='account'){
  must(a.admin,'Chỉ quản trị viên được cấp tài khoản.',403);
  const name=str(b.name,120),username=str(b.username,50).toLowerCase();must(name&&/^[a-z0-9._-]{3,50}$/.test(username)&&b.unit===unit);
+ must(b.staffCode&&b.role,'Hãy chọn hồ sơ trong Nhân sự & Hợp đồng để cấp quyền.',409);
  let linked:null|{position:string;status:string;department:string;name:string}=null;
  if(b.staffCode){
-  const code=str(b.staffCode,150);
+  const code=str(b.staffCode,150).toLocaleLowerCase('vi');
   const list=checked(await client.from('cx_staff_catalog').select('source_id,name,department,copies').eq('unit',unit).eq('code',code).limit(2));
   must(list&&list.length===1&&Number(list[0].copies)===1,'Mã nhân viên chưa có hồ sơ duy nhất trong Nhân sự & Hợp đồng.',409);
   const record=checked(await client.from('ksnk_legacy_rows').select('data').eq('sheet_name','DM_NHANVIEN').eq('id',list[0].source_id).maybeSingle());
@@ -119,7 +120,7 @@ async function dispatch(req:Request){
  }
  }
  if(typeof b.canApproveWork==='boolean')patch.can_approve_work=b.canApproveWork&&b.edit===true&&['chief','head_nurse','deputy','team'].includes(b.role);
- if(b.staffCode){must(typeof b.staffCode==='string'&&b.staffCode.length<=150);patch.staff_code=b.staffCode;}
+ if(b.staffCode){must(typeof b.staffCode==='string'&&b.staffCode.length<=150);patch.staff_code=str(b.staffCode,150).toLocaleLowerCase('vi');}
  if(b.code)patch.pending_login=false;
  if(b.code||!b.id){const code=str(b.code,72);must(code.length>=12&&Buffer.byteLength(code)<=72,'Mã cần ít nhất 12 ký tự và tối đa 72 byte.');patch.credential=await hash(code,12);}
  if(b.id){

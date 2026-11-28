@@ -6,21 +6,27 @@ export async function GET(req:Request){
  const admin=await actor()
  if(!admin?.admin)return Response.json({error:'Chỉ quản trị viên được mở bảng phân quyền.'},{status:403})
  const client=db()
- const [people,grants,old,roleDefaults]=await Promise.all([
-  client.from('cx_people').select('id,name,username,department,staff_code,team_department,managed_departments,position_policy,legacy_operator,team_lead,work_role_reviewed,work_view,work_edit,can_approve_work,active,unit,admin,pending_login,version').eq('unit','surgery').eq('active',true).eq('admin',false).order('name'),
+ const [people,grants,old,roleDefaults,staff]=await Promise.all([
+  client.from('cx_people').select('id,name,username,department,staff_code,team_department,managed_departments,position_policy,legacy_operator,team_lead,work_role_reviewed,work_view,work_edit,can_approve_work,active,unit,admin,pending_login,version').eq('unit','surgery').eq('admin',false).order('name'),
   client.from('nk_feature_permissions').select('person,grants,version'),
   client.from('nk_report_permissions').select('person,scope,can_export'),
-  client.from('nk_role_permission_defaults').select('role,grants,version')
+  client.from('nk_role_permission_defaults').select('role,grants,version'),
+  client.from('nk_legacy_rows').select('data').eq('sheet_name','DM_NHANVIEN')
  ])
- if(people.error||grants.error||old.error||roleDefaults.error)return Response.json({error:'Chưa cài migration ma trận phân quyền hoặc chưa truy cập được dữ liệu.'},{status:503})
+ if(staff.error||people.error||grants.error||old.error||roleDefaults.error)return Response.json({error:'Chưa cài migration ma trận phân quyền hoặc chưa truy cập được dữ liệu.'},{status:503})
  const grantMap=new Map((grants.data||[]).map(g=>[g.person,g]))
  const legacyMap=new Map((old.data||[]).map(g=>[g.person,g]))
  const roleMap=new Map((roleDefaults.data||[]).map(g=>[g.role,g]))
+ const positions=new Map<string,string>();
+ for(const {data:hr} of staff.data||[]){
+  const code=String(hr['Mã NV']||'').trim().toLowerCase();
+  if(code)positions.set(code,positions.has(code)?'Mã nhân viên trùng':String(hr['Chức vụ']||hr['Chức danh']||''));
+ }
  const rows=(people.data||[]).map(person=>{
   const grant=grantMap.get(person.id)
   const legacy=legacyMap.get(person.id)
   const policy=(roleMap.get(roleOf(person))?.grants||{}) as GrantMatrix
-  return {...person,version:grant?.version||null,
+  return {...person,hrPosition:positions.get(String(person.staff_code||'').trim().toLowerCase())||'Chưa đối chiếu',policyName:roleNames[roleOf(person)],version:grant?.version||null,
    overrides:(grant?.grants||{}) as GrantMatrix,
    effective:effectiveMatrix(person,grant?.grants as GrantMatrix|undefined,legacy as {scope:Scope;can_export:boolean}|undefined,policy),
    defaults:effectiveMatrix(person,{},legacy as {scope:Scope;can_export:boolean}|undefined,policy)}

@@ -25,5 +25,5 @@ export function roleForStaffPosition(value:unknown):AccountWorkRole|null{
 }
 export function roleAllowedByPosition(role:AccountWorkRole,position:unknown):boolean{
  const expected=roleForStaffPosition(position);
- return Boolean(expected&&(role==='staff'||role===expected||expected==='deputy'&&['team','chief'].includes(role)||expected==='head_nurse'&&role==='chief'));
+ return expected!==null&&role===expected;
 }

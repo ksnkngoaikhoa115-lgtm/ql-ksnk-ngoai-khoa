@@ -57,6 +57,7 @@ async function start(){
  dashboard();await refresh();
  const q=new URLSearchParams(location.search);
  if(q.has('thread')){try{await openThread(q.get('thread'));}catch(e){modal('Không mở được phiếu','<p>'+esc(e.message)+'</p>');}}
+ if(target==='admin'&&r.me.admin&&q.has('employee')){const profile=state.people.find(p=>p.id===q.get('employee'));if(profile)await account(profile);}
  if(target==='account')changeCode();
  if(q.has('row')){
  try{const result=await api('sourceThread',{kind:state.tab,row:Number(q.get('row')),ref:q.get('ref')});
@@ -116,7 +117,7 @@ function paint(){
  $('#heading').textContent=(k==='task'?((state.me.admin||state.me.legacy_operator)?'Giao việc toàn viện':'Việc được giao'):names[k])+((state.due?.[k]||0)>0?' · '+state.due[k]+' việc của tôi đến hạn hoặc quá hạn':'');$('#pager').innerHTML='';
  if(k==='admin'){
  $('#actions').innerHTML='<button class="primary" id="new">Cấp tài khoản</button><button id="matrixToggle" type="button">▦ MA TRẬN CẤP QUYỀN</button><button id="roster" type="button">Danh mục nhân viên hiện tại</button>';
- $('#new').onclick=()=>account();$('#roster').onclick=()=>run(directory);
+ $('#new').onclick=()=>run(directory);$('#roster').onclick=()=>run(directory);
  $('#matrixToggle').onclick=()=>{window.top.location.assign('/ngoai-khoa?work=permissions')};
  const query=state.adminSearch||'';
  const list=state.people.filter(x=>(state.scope==='all'||x.unit===state.scope)&&(!query||[x.name,x.username,x.department,x.staff_code].some(value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(query.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()))));
@@ -154,15 +155,14 @@ function changeCode(){
 }
 function submit(fn){$('#edit').onsubmit=e=>{e.preventDefault();const form=e.currentTarget;run(()=>fn(new FormData(form)),form.querySelector('button[type=submit],button.primary'))};}
 async function account(x,staff){
- if(!staff&&x?.staff_code){try{const catalog=state.staffDirectory||await api('directory');state.staffDirectory=catalog;staff=catalog.staff?.find(entry=>entry.code===x.staff_code&&entry.unit===x.unit);}catch(e){notice('Không tải được hồ sơ nhân sự: '+e.message);}}
+ if(!staff&&x?.staff_code){try{const catalog=await api('directory');state.staffDirectory=catalog;staff=catalog.staff?.find(entry=>entry.code===x.staff_code&&entry.unit===x.unit);}catch(e){notice('Không tải được hồ sơ nhân sự: '+e.message);}}
  const position=staff?.position||'',employment=staff?.employmentStatus||'';
  const suggested=hrRole(position);
  const roleNames={chief:'Trưởng khoa',deputy:'Phó khoa',head_nurse:'Điều dưỡng trưởng',team:'Tổ trưởng',staff:'Nhân viên'};
- const stored=x?.position_policy||(x?.legacy_operator?'chief':x?.team_lead?'team':'staff');
- const allowed=suggested?new Set(['staff',suggested,...(suggested==='deputy'?['team','chief']:[]),...(x&&stored==='chief'&&suggested==='head_nurse'?['chief']:[])]):new Set(['chief','team','staff']);
- if(x&&!x.pending_login)allowed.add(stored);
+ if(!staff){await directory();notice('Chọn hồ sơ nhân sự để liên kết tài khoản.');return;}
+ const allowed=new Set(suggested?[suggested]:[]);
  const roleChoices=Object.fromEntries(Object.entries(roleNames).filter(([key])=>allowed.has(key)));
- modal(x?'Cập nhật nhân viên':'Cấp tài khoản','<form id="edit"><label>Họ tên<input name="name" required value="'+esc(staff?.name||x?.name)+'"></label><label>Tên đăng nhập<input name="username" pattern="[a-z0-9._\\-]{3,50}" required value="'+esc(x?.pending_login?'':x?.username)+'"></label><label>Đơn vị<select name="unit">'+options(units,staff?.unit||x?.unit||'surgery')+'</select></label><label>Chức vụ trong Nhân sự<input readonly value="'+esc(position||'Chưa liên kết hồ sơ')+'"></label><label>Trạng thái nhân sự<input readonly value="'+esc(employment||'Chưa đối chiếu')+'"></label><label>Mã NV<input readonly value="'+esc(staff?.code||x?.staff_code||'Chưa liên kết')+'"></label><label>Mã mới '+(x&&!x.pending_login?'(để trống để giữ mã)':'')+'<input type="password" name="code" minlength="12" '+(x&&!x.pending_login?'':'required')+'></label><label>Trạng thái<select name="active">'+options({on:'Đang hoạt động',off:'Khóa tài khoản'},x?.active===false&&!x.pending_login?'off':'on')+'</select></label><label>Phân quyền nghiệp vụ<select name="role">'+options(roleChoices,x&&!x.pending_login?stored:suggested||'staff')+'</select></label><div class="actions"><button type="button" id="applyHrRole">Đồng bộ vai trò theo Chức vụ</button><small id="hrRoleNote"></small></div><label id="teamDept">Bộ phận phụ trách<select name="department"><option value="">Chọn bộ phận</option>'+options(Object.fromEntries([...new Set(state.people.map(p=>p.department).filter(Boolean))].map(d=>[d,d])),x?.team_department||x?.department||staff?.department)+'</select></label><fieldset><legend>Quyền xem và cập nhật công việc của nhân viên</legend><label><input type="checkbox" name="view" '+(x?.work_view===false?'':'checked')+'> Được xem</label><label><input type="checkbox" name="editWork" '+(x?.work_edit===false?'':'checked')+'> Được sửa</label></fieldset><button class="primary">Lưu tài khoản</button></form>');
+ modal(x?'Cập nhật nhân viên':'Cấp tài khoản','<form id="edit"><label>Họ tên<input name="name" required value="'+esc(staff?.name||x?.name)+'"></label><label>Tên đăng nhập<input name="username" pattern="[a-z0-9._\\-]{3,50}" required value="'+esc(x?.pending_login?'':x?.username)+'"></label><label>Đơn vị<select name="unit">'+options(units,staff?.unit||x?.unit||'surgery')+'</select></label><label>Chức vụ trong Nhân sự<input readonly value="'+esc(position||'Chưa liên kết hồ sơ')+'"></label><label>Trạng thái nhân sự<input readonly value="'+esc(employment||'Chưa đối chiếu')+'"></label><label>Mã NV<input readonly value="'+esc(staff?.code||x?.staff_code||'Chưa liên kết')+'"></label><label>Mã mới '+(x&&!x.pending_login?'(để trống để giữ mã)':'')+'<input type="password" name="code" minlength="12" '+(x&&!x.pending_login?'':'required')+'></label><label>Trạng thái<select name="active">'+options({on:'Đang hoạt động',off:'Khóa tài khoản'},x?.active===false&&!x.pending_login?'off':'on')+'</select></label><label>Phân quyền nghiệp vụ<select name="role">'+options(roleChoices,suggested||'')+'</select></label><div class="actions"><button type="button" id="applyHrRole">Đồng bộ vai trò theo Chức vụ</button><small id="hrRoleNote"></small></div><label id="teamDept">Bộ phận phụ trách<select name="department"><option value="">Chọn bộ phận</option>'+options(Object.fromEntries([...new Set(state.people.map(p=>p.department).filter(Boolean))].map(d=>[d,d])),x?.team_department||x?.department||staff?.department)+'</select></label><fieldset><legend>Quyền xem và cập nhật công việc của nhân viên</legend><label><input type="checkbox" name="view" '+(x?.work_view===false?'':'checked')+'> Được xem</label><label><input type="checkbox" name="editWork" '+(x?.work_edit===false?'':'checked')+'> Được sửa</label></fieldset><button class="primary">Lưu tài khoản</button></form>');
  const roles=$('#edit').elements;
 
  const multi=document.createElement('fieldset');multi.id='managedDept';const legend=document.createElement('legend');legend.textContent='Các bộ phận phụ trách';multi.append(legend);
@@ -250,7 +250,7 @@ async function openThread(id){
   for(const name of ['title','due','note'])form.elements[name].readOnly=!editable;
   form.elements.personal.readOnly=!editable;
   if(form.elements.opinion)form.elements.opinion.readOnly=!editable;
-  if(editable){const rid=crypto.randomUUID();submit(async fd=>{await api('detailSave',{...Object.fromEntries(fd),id,expected:t.seq,requestId:rid});await openThread(id)});}
+  if(editable){const rid=crypto.randomUUID();submit(async fd=>{await api('detailSave',{...Object.fromEntries(fd),id,expected:t.seq,requestId:rid});notifyParent('ksnk-work-updated',id);await openThread(id)});}
   else form.onsubmit=e=>e.preventDefault();
  }
  const evidenceForm=$('#workEvidence');
@@ -270,8 +270,16 @@ async function openThread(id){
    if(c.canReview){select.add(new Option('Phê duyệt','approve'));if(choices.length){select.add(new Option('Đồng ý và trình cấp trên','forward'));select.add(new Option('Đã xem xét và xin ý kiến','consult'));}select.add(new Option('Yêu cầu bổ sung','supplement'));select.add(new Option('Từ chối phê duyệt','reject'));}
    if(c.canReopen)select.add(new Option('Mở lại có lý do','reopen'));
    if(select.options.length){const label=document.createElement('label');label.textContent='Chức vụ phê duyệt';label.append(role,recipient);button.textContent='Lưu xử lý phê duyệt';let rid='',last='';
-    const update=()=>{label.hidden=!['request','forward','consult'].includes(select.value)};select.onchange=update;panel.append(select,label,note,button);update();
-    button.onclick=()=>run(async()=>{const next=['request','forward','consult'].includes(select.value);if(next&&!recipient.value)throw Error('Chọn người nhận');if(select.value!=='approve'&&!note.value.trim())throw Error('Nhập nội dung hoặc lý do');const payload={id,operation:select.value,reviewer:next?recipient.value:null,expected:c.status,expectedRevision:c.revision,note:note.value.trim()};const key=JSON.stringify(payload);if(key!==last){rid=crypto.randomUUID();last=key;}await api('decision',{...payload,requestId:rid});await openThread(id)},button);
+    const evaluation=document.createElement('select');
+    const assessment=document.createElement('label');
+    if(t.kind==='task'&&c.canReview){
+     assessment.textContent='Đánh giá quản lý';
+     evaluation.add(new Option('Giữ đánh giá hiện tại',''));
+     for(const value of ['CHƯA BẮT ĐẦU','XUẤT SẮC','TỐT','KHÁ','CHƯA ĐẠT_LÀM LẠI','KÉM','QUÁ HẠN'])evaluation.add(new Option(value,value));
+     assessment.append(evaluation);panel.append(assessment);
+    }
+    const update=()=>{label.hidden=!['request','forward','consult'].includes(select.value);assessment.hidden=['request','reopen'].includes(select.value)};select.onchange=update;panel.append(select,label,note,button);update();
+    button.onclick=()=>run(async()=>{const next=['request','forward','consult'].includes(select.value);if(next&&!recipient.value)throw Error('Chọn người nhận');if(select.value!=='approve'&&!note.value.trim())throw Error('Nhập nội dung hoặc lý do');const payload={id,operation:select.value,reviewer:next?recipient.value:null,expected:c.status,expectedRevision:c.revision,evaluation:assessment.hidden?null:evaluation.value||null,note:note.value.trim()};const key=JSON.stringify(payload);if(key!==last){rid=crypto.randomUUID();last=key;}await api('decision',{...payload,requestId:rid});notifyParent('ksnk-work-updated',id);await openThread(id)},button);
    }
    if(c.history?.length){const list=document.createElement('ol');for(const event of c.history){const li=document.createElement('li');li.textContent=[event.at,event.managerName,event.actorPosition,event.status,event.reviewerName,event.opinion||event.request].filter(Boolean).join(' · ');list.append(li)}panel.append(list);}
   }catch(e){panel.textContent='Không tải được phê duyệt: '+e.message;}
@@ -289,7 +297,7 @@ async function openThread(id){
  if(inline){$('#editTask').hidden=true;$('#editTask').insertAdjacentHTML('afterend',editor);}else modal('Sửa '+names[t.kind].toLowerCase(),editor);
  const edit=$('#edit');edit.elements.title.readOnly=!shared;edit.elements.note.readOnly=!shared;edit.elements.due.readOnly=!shared;edit.elements.due.required=false;
  edit.querySelector('button').insertAdjacentHTML('beforebegin','<label>Ghi chú cá nhân<textarea name="personal" maxlength="6000">'+esc(r.personal)+'</textarea></label>'+(r.manage?'<label>Ý kiến quản lý<textarea name="opinion" maxlength="6000">'+esc(r.opinion)+'</textarea></label>':''));
- const rid=crypto.randomUUID();submit(async fd=>{await api('detailSave',{...Object.fromEntries(fd),id,expected:t.seq,requestId:rid});await openThread(id);});};
+ const rid=crypto.randomUUID();submit(async fd=>{await api('detailSave',{...Object.fromEntries(fd),id,expected:t.seq,requestId:rid});notifyParent('ksnk-work-updated',id);await openThread(id);});};
  if($('#saveStatus'))$('#saveStatus').onclick=e=>run(async()=>{await api('status',{id,status:$('#progress').value,requestId:crypto.randomUUID()});await updateThread();await refresh()},e.target);
  $('#older').onclick=e=>run(async()=>{const older=await api('thread',{id,before:state.first});if(state.thread!==id)return;const height=stream.scrollHeight;$('#messages').insertAdjacentHTML('afterbegin',messages(older.rows));state.first=older.rows[0]?.seq||state.first;$('#older').hidden=older.rows.length<50;stream.scrollTop+=stream.scrollHeight-height},e.target);
  const form=$('#send'),text=form.elements.body;

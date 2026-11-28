@@ -4,7 +4,7 @@ import {useEffect,useMemo,useState} from 'react'
 type Scope='none'|'self'|'team'|'hospital'
 type Action='view'|'create'|'edit'|'delete'|'approve'|'history'|'export'
 type Grants=Record<string,Partial<Record<Action,Scope>>>
-type Person={id:string;name:string;username:string;department:string;staff_code:string|null;team_department:string|null;managed_departments?:string[]|null;team_lead:boolean;work_role_reviewed:boolean;legacy_operator:boolean;work_view:boolean;work_edit:boolean;can_approve_work?:boolean;version:string|null;overrides:Grants;effective:Grants;defaults:Grants}
+type Person={active:boolean;pending_login:boolean;hrPosition:string;policyName:string;id:string;name:string;username:string;department:string;staff_code:string|null;team_department:string|null;managed_departments?:string[]|null;team_lead:boolean;work_role_reviewed:boolean;legacy_operator:boolean;work_view:boolean;work_edit:boolean;can_approve_work?:boolean;version:string|null;overrides:Grants;effective:Grants;defaults:Grants}
 type Payload={people:Person[];features:Record<string,Action[]>;featureLabels:Record<string,string>;actionLabels:Record<Action,string>;history:Array<{changed_at:string;changed_by:string}>}
 const captions:Record<Scope,string>={none:'— Không',self:'Cá nhân',team:'Toàn tổ',hospital:'Toàn khoa'}
 const rank:Record<Scope,number>={none:0,self:1,team:2,hospital:3}
@@ -16,7 +16,7 @@ export default function PermissionMatrix(){
  const [history,setHistory]=useState<Payload['history']>([]),[resetting,setResetting]=useState(false),[dirty,setDirty]=useState(false)
  const selected=data?.people.find(p=>p.id===person)
  const ceiling:Scope='hospital' // Administrator may delegate a particular action beyond position defaults
- const filtered=useMemo(()=>data?.people.filter(p=>tidy([p.name,p.username,p.department,p.staff_code||''].join(' ')).includes(tidy(search)))||[],[data,search])
+ const filtered=useMemo(()=>data?.people.filter(p=>tidy([p.name,p.username,p.department,p.hrPosition,p.staff_code||''].join(' ')).includes(tidy(search)))||[],[data,search])
  async function refresh(target?:string){
   const response=await fetch('/api/settings/feature-permissions'+(target?'?person='+encodeURIComponent(target):''),{cache:'no-store'})
   const json=await response.json()
@@ -102,10 +102,12 @@ export default function PermissionMatrix(){
    <p>Chọn quyền cho từng chức năng và phạm vi. <b>Không cho phép</b> thu hồi quyền, <b>Cho phép</b> chọn phạm vi Cá nhân, Toàn tổ hoặc Toàn khoa.</p>
   </div><span className="pmatrix-counter">{activeCount} quyền có hiệu lực · {delegatedSummary.length} quyền mở rộng</span></div>
   <div className="pmatrix-filters">
-   <label>Tìm theo họ tên, mã nhân viên, tài khoản, bộ phận<input type="search" autoComplete="off" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nhập từ khóa tìm nhân viên…"/></label>
-   <label>Chọn nhân viên<select value={person} onChange={e=>choose(e.target.value)}><option value="">— Chọn nhân viên để cấp quyền —</option>{filtered.map(p=><option key={p.id} value={p.id}>{p.name} · {p.username} · {p.department}</option>)}{selected&&!filtered.some(p=>p.id===selected.id)&&<option value={selected.id}>{selected.name} (đang chọn)</option>}</select></label>
+   <label>Tìm theo họ tên, mã nhân viên, tài khoản, chức vụ, bộ phận<input type="search" autoComplete="off" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nhập từ khóa tìm nhân viên…"/></label>
+   <label>Chọn nhân viên<select value={person} onChange={e=>choose(e.target.value)}><option value="">— Chọn nhân viên để cấp quyền —</option>{filtered.map(p=><option key={p.id} value={p.id}>{p.name} · {p.hrPosition} · {p.staff_code} · {p.department}{p.active?'':p.pending_login?' · Chờ kích hoạt':' · Đã khóa'}</option>)}{selected&&!filtered.some(p=>p.id===selected.id)&&<option value={selected.id}>{selected.name} (đang chọn)</option>}</select></label>
   </div>
-  {selected&&<>
+  {selected&&!selected.active&&<p>{selected.name} · {selected.pending_login?'Chờ kích hoạt':'Tài khoản đang khóa'}. <a target="_top" href={'/ngoai-khoa?work=admin&employee='+encodeURIComponent(selected.id)}>Mở tài khoản nhân sự</a></p>}
+  {selected?.active&&<>
+   <p>Chức vụ nhân sự: <b>{selected.hrPosition}</b> · Chính sách quyền đang áp dụng: <b>{selected.policyName}</b> · Tài khoản CONNECT: <b>{selected.username}</b></p>
    <div className="pmatrix-toolbar">
     <div><b>Ủy quyền nhanh: Chỉ xem Toàn khoa</b><p>Áp dụng riêng cho phân hệ chọn dưới đây; giữ nguyên quyền Thêm, Sửa, Xóa, Phê duyệt và Xuất báo cáo.</p></div>
     <div className="pmatrix-quick">
