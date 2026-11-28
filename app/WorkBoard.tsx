@@ -3,7 +3,7 @@ import {createContext,useContext,useEffect,useState} from 'react';
 import {isWorkEnded,workWarningReasons,type WorkWarningType} from '../lib/work-warning-policy';
 
 type Kind='task'|'reminder';
-type Item={id:string;source_row:number;kind:Kind;title:string;note?:string;status:string;due:string;latest_message:string;mentioned:boolean;message_time:string;message_sender:string;owner_id:string;performers:string[];observers:string[];received_by?:string[];daily?:boolean;daily_done_today?:boolean};
+type Item={id:string;source_row:number;lead?:string;deadline?:string;kind:Kind;title:string;note?:string;status:string;due:string;latest_message:string;mentioned:boolean;message_time:string;message_sender:string;owner_id:string;performers:string[];observers:string[];received_by?:string[];daily?:boolean;daily_done_today?:boolean};
 type Row={item:Item;unread:number};
 export function useWorkFeed(){return useContext(Feed);}
 const labels={task:'Giao việc',reminder:'Nhắc việc'};
@@ -97,7 +97,7 @@ export default function WorkBoard({kind,home=false,manager=false,who=''}:{kind?:
   (!employee||t.performers.includes(employee)||t.owner_id===employee)&&
   (!mine||[t.owner_id,...t.performers,...t.observers].includes(who)));
  const decorated=visible.map(row=>({...row,reasons:workWarningReasons(row,who,manager||team,today)}));
- const types:WorkWarningType[]=['Mới giao','Đến hạn hôm nay','Quá hạn','Tin chưa đọc','Nhắc hằng ngày'];
+ const types:WorkWarningType[]=['Mới giao','Đến hạn hôm nay','Quá hạn','Tin chưa đọc','Nhắc hằng ngày','Đã đến ngày nhắc'];
  const items=decorated.filter(row=>filter?row.reasons.includes(filter):!home||row.reasons.length>0);
  async function acknowledge(id:string,action:'receive'|'dailyDone'){
   if(saving)return;
@@ -161,7 +161,7 @@ export function WorkAgenda(){
  const {rows,names,open,ready,error}=useWorkFeed();
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}).format(new Date());
  const [day,setDay]=useState(today);
- const entries=rows.filter(({item})=>item.due===day||
+ const entries=rows.filter(({item})=>item.due===day||item.deadline===day||
   (item.daily&&day>=today&&(!item.due||item.due<=day)&&!isWorkEnded(item.status)))
   .sort((a,b)=>a.item.title.localeCompare(b.item.title,'vi'));
  return <section className="panel-card">

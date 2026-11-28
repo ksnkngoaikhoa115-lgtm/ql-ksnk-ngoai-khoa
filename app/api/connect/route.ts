@@ -147,7 +147,15 @@ async function dispatch(req:Request){
  const meta=await rpc('nk_warning_meta',{who:a.id,work_ids:page.map(row=>String(row.item.id))}) as
   Array<{id:string;received_by:string[];daily:boolean;daily_done_today:boolean}>;
  const byId=new Map(meta.map(entry=>[entry.id,entry]));
- return page.map(row=>({...row,item:{...row.item,...(byId.get(String(row.item.id))||{})}}));
+ const sourceIds=page.map(row=>Number(row.item.source_row)).filter(Number.isSafeInteger);
+ const fields=sourceIds.length?checked(await client.from('nk_legacy_rows')
+  .select('id,data')
+  .eq('sheet_name',b.kind==='task'?'GIAO VIỆC':'NHAC_VIEC_GHI_CHU').in('id',sourceIds))||[]:[];
+ const sources=new Map(fields.map(row=>[Number(row.id),row.data as Record<string,string>]));
+ return page.map(row=>{
+  const source=sources.get(Number(row.item.source_row));
+  return {...row,item:{...row.item,...byId.get(String(row.item.id)),lead:source?.['Phụ trách chính']||'',deadline:source?.['Hạn hoàn thành']||''}};
+ });
  }
  if(b.action==='board'){
  const screen=b.kind||'all';must(screen==='all'||kinds.includes(screen));
