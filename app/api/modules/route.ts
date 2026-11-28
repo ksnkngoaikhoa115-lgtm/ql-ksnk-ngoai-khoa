@@ -509,7 +509,7 @@ export async function GET(req:Request){const viewer=await actor();if(!viewer)ret
   if(!allowed.includes(moduleName))return NextResponse.json({ok:false,error:'Phân hệ ngoài phạm vi tài khoản.'},{status:403});
   const f=parseFilters(url);
   const selectable=viewScope==='team'&&viewer.position_policy==='deputy'?managedDepartments(viewer):[text(viewer.team_lead?(viewer.team_department||viewer.department):viewer.department)];
-  if(selectable.length>1&&f.department&&!selectable.some(d=>same(d,f.department)))return NextResponse.json({ok:false,error:'Bộ phận ngoài phạm vi.'},{status:403});
+  if(viewer.position_policy==='deputy'&&viewScope==='team'&&f.department&&!selectable.some(d=>same(d,f.department)))return NextResponse.json({ok:false,error:'Bộ phận ngoài phạm vi.'},{status:403});
   const department=selectable.find(d=>same(d,f.department))||selectable[0]||'';
   if(!department)return NextResponse.json({ok:false,error:'Tài khoản chưa có bộ phận được xác thực.'},{status:403});
   const allStaff=getStaff(await readSheet(S.staff,true));

@@ -149,8 +149,8 @@ export async function featureScope(person:Person,feature:Feature,action:Action):
 }
 export function managedDepartments(person:Pick<Person,'position_policy'|'team_department'|'department'|'managed_departments'>):string[]{
  const fallback=String(person.team_department||person.department||'').trim();
- const values=person.position_policy==='deputy'&&Array.isArray(person.managed_departments)&&person.managed_departments.length>0&&person.managed_departments.length<=2&&normalized(person.managed_departments[0])===normalized(fallback)?person.managed_departments:[fallback];
- return [...new Map(values.filter(v=>typeof v==='string'&&normalized(v)).map(v=>[normalized(v),v.trim()])).values()].slice(0,person.position_policy==='deputy'?2:1);
+ const values=person.position_policy==='deputy'&&Array.isArray(person.managed_departments)&&person.managed_departments.length>0&&normalized(person.managed_departments[0])===normalized(fallback)?person.managed_departments:[fallback];
+ return [...new Map(values.filter(v=>typeof v==='string'&&normalized(v)).map(v=>[normalized(v),v.trim()])).values()];
 }
 export function managesDepartment(person:Pick<Person,'position_policy'|'team_department'|'department'|'managed_departments'>,department:unknown):boolean{
  return Boolean(normalized(department)&&managedDepartments(person).some(d=>normalized(d)===normalized(department)));

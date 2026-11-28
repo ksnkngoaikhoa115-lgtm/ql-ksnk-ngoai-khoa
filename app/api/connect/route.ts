@@ -111,8 +111,8 @@ async function dispatch(req:Request){
  if(!patch.team_lead){patch.team_department=null;patch.managed_departments=[];}
  if(patch.team_lead){
  const requested=b.role==='deputy'&&Array.isArray(b.departments)?b.departments:[b.department||linked?.department||''];
- must(requested.length>=1&&requested.length<=(b.role==='deputy'?2:1)&&requested.every((d:unknown)=>typeof d==='string'&&d.trim().length>0&&d.length<=150),'Chọn tối đa hai bộ phận đối với Phó khoa.');
- const deps=requested.map((d:string)=>d.trim());must(new Set(deps.map((d:string)=>d.toLocaleLowerCase('vi'))).size===deps.length,'Không chọn bộ phận trùng lặp.');
+ must(requested.length>=1&&(b.role==='deputy'||requested.length===1)&&requested.every((d:unknown)=>typeof d==='string'&&d.trim().length>0&&d.length<=150),'Hãy chọn ít nhất một bộ phận hợp lệ; Tổ trưởng chỉ được chọn một bộ phận.');
+ const deps=requested.map((d:string)=>d.trim());must(new Set(deps.map((d:string)=>d.normalize('NFC').toLocaleLowerCase('vi'))).size===deps.length,'Không chọn bộ phận trùng lặp.');
  const catalog=await people(true);must(deps.every((dep:string)=>linked?.department===dep||catalog.some(p=>p.department===dep)),'Bộ phận chưa có trong danh mục nhân sự.');
  patch.team_department=deps[0];patch.managed_departments=b.role==='deputy'?deps:[];
  }
