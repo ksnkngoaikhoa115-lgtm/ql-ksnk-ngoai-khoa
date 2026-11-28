@@ -147,11 +147,18 @@ export async function featureMatrix(person:Person){
 export async function featureScope(person:Person,feature:Feature,action:Action):Promise<Scope>{
  return (await featureMatrix(person))[feature]?.[action]??'none'
 }
+export function managedDepartments(person:Pick<Person,'position_policy'|'team_department'|'department'|'managed_departments'>):string[]{
+ const fallback=String(person.team_department||person.department||'').trim();
+ const values=person.position_policy==='deputy'&&Array.isArray(person.managed_departments)&&person.managed_departments.length>0?person.managed_departments:[fallback];
+ return [...new Map(values.filter(v=>typeof v==='string'&&normalized(v)).map(v=>[normalized(v),v.trim()])).values()].slice(0,person.position_policy==='deputy'?2:1);
+}
+export function managesDepartment(person:Pick<Person,'position_policy'|'team_department'|'department'|'managed_departments'>,department:unknown):boolean{
+ return Boolean(normalized(department)&&managedDepartments(person).some(d=>normalized(d)===normalized(department)));
+}
 export function inFeatureScope(person:Person,scope:Scope,department?:unknown,staffId?:unknown,staffName?:unknown):boolean{
  if(!person.active||person.unit!=='surgery'||scope==='none')return false
  if(scope==='hospital')return true
- const ownDepartment=person.team_department||person.department
- if(!department||!ownDepartment||normalized(department)!==normalized(ownDepartment))return false
+ if(!managesDepartment(person,department))return false
  if(scope==='team')return true
  return Boolean(person.staff_code&&staffId&&normalized(person.staff_code)===normalized(staffId)||
   staffName&&normalized(staffName)===normalized(person.name))

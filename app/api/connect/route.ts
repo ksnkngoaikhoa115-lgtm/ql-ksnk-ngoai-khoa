@@ -1,3 +1,4 @@
+import {managedDepartments,managesDepartment} from '../../../lib/feature-permissions';
 import {staffPosition,staffEmploymentStatus,roleAllowedByPosition} from '../../../lib/staff-roles';
 import {actor,db,personFields,Person} from '../../../lib/auth';
 import {featureScope} from '../../../lib/feature-permissions';
@@ -107,10 +108,13 @@ async function dispatch(req:Request){
  if(['deputy','head_nurse'].includes(b.role))must(linked,'Cần liên kết chức vụ trong hồ sơ nhân sự.',409);
  patch.position_policy=['deputy','head_nurse'].includes(b.role)?b.role:null;
  patch.work_role_reviewed=true;patch.legacy_operator=['chief','head_nurse'].includes(b.role);patch.team_lead=['deputy','team'].includes(b.role);patch.work_view=b.view;patch.work_edit=b.edit;
- if(!patch.team_lead)patch.team_department=null;
+ if(!patch.team_lead){patch.team_department=null;patch.managed_departments=[];}
  if(patch.team_lead){
- const dep=str(linked?.department||b.department||'',150);must(dep,'Hãy chọn bộ phận của tổ trưởng.');
- must(linked?.department===dep||(await people(true)).some(p=>p.department===dep),'Bộ phận chưa có trong danh mục nhân sự.');patch.team_department=dep;
+ const requested=b.role==='deputy'&&Array.isArray(b.departments)?b.departments:[b.department||linked?.department||''];
+ must(requested.length>=1&&requested.length<=(b.role==='deputy'?2:1)&&requested.every((d:unknown)=>typeof d==='string'&&d.trim().length>0&&d.length<=150),'Chọn tối đa hai bộ phận đối với Phó khoa.');
+ const deps=requested.map((d:string)=>d.trim());must(new Set(deps.map((d:string)=>d.toLocaleLowerCase('vi'))).size===deps.length,'Không chọn bộ phận trùng lặp.');
+ const catalog=await people(true);must(deps.every((dep:string)=>linked?.department===dep||catalog.some(p=>p.department===dep)),'Bộ phận chưa có trong danh mục nhân sự.');
+ patch.team_department=deps[0];patch.managed_departments=b.role==='deputy'?deps:[];
  }
  }
  if(typeof b.canApproveWork==='boolean')patch.can_approve_work=b.canApproveWork&&b.edit===true&&['chief','head_nurse','deputy','team'].includes(b.role);
@@ -193,7 +197,7 @@ async function dispatch(req:Request){
  if(kind==='chat')must(p.length===1&&p[0]!==a.id&&!o.length);
  const selected=(await people()).filter(x=>(x.active||(kind!=='chat'&&x.pending_login))&&(p.includes(x.id)||o.includes(x.id)));
  must(new Set([...p,...o]).size===selected.length,'Người nhận không thuộc phạm vi tài khoản.',403);
- if(kind!=='chat'&&(await featureScope(a,kind==='task'?'tasks':'reminders','create'))==='team'){const department=(a.team_department||a.department||'').trim().toLocaleLowerCase('vi');must(department&&selected.every(p=>p.department?.trim().toLocaleLowerCase('vi')===department),'Chỉ được giao việc cho nhân viên trong bộ phận phụ trách.',403);}
+ if(kind!=='chat'&&(await featureScope(a,kind==='task'?'tasks':'reminders','create'))==='team'){must(managedDepartments(a).length&&selected.every(p=>managesDepartment(a,p.department)),'Chỉ được giao việc cho nhân viên trong bộ phận phụ trách.',403);}
  const u=[...new Set([a.unit,...selected.map(x=>x.unit)])],label=kind==='chat'?'Trao đổi riêng':str(b.title,180);
  must(label);const d=b.due||null;must(!d||/^\d{4}-\d{2}-\d{2}$/.test(d));
  const id=await rpc('cx_create',{t:b.id,k:kind,label,who:a.id,p,o,u,d,details:str(b.note||'',6000),pk:kind==='chat'?[a.id,p[0]].sort().join(':'):null,attachments:await attachments()});return {id};
@@ -257,8 +261,7 @@ async function dispatch(req:Request){
  const personal=t.kind!=='chat'?checked(await client.from('nk_personal_work_notes').select('note').eq('thread',t.id).eq('person',a.id).maybeSingle())?.note||'':'';
  const dept=String(source['Bộ phận']||source['Thuộc bộ phận']||'').trim();
  const assignments=t.performers.length&&a.team_lead?(await people(true)).filter(p=>t.performers.includes(p.id)):[];
- const managedDepartment=a.team_department||a.department;
- const manages=a.admin||a.legacy_operator||(a.team_lead&&!!managedDepartment&&(dept?dept.trim().toLowerCase()===managedDepartment.trim().toLowerCase():assignments.length===t.performers.length&&assignments.length>0&&assignments.every(p=>p.department===managedDepartment)));
+ const manages=a.admin||a.legacy_operator||(a.team_lead&&managedDepartments(a).length>0&&(dept?managesDepartment(a,dept):assignments.length===t.performers.length&&assignments.length>0&&assignments.every(p=>managesDepartment(a,p.department))));
  const originalFields=t.kind==='task'?[
   ['Mã công việc',source['ID']||source['Mã công việc']],
   ['Phân loại công việc',source['Loại công việc']||source['Phân loại công việc']],
